@@ -9,7 +9,7 @@
 
 void main_P1() {
   while( 1 ) {
-    write( STDOUT_FILENO, "P1", 2 );
+    write( STDOUT_FILENO, "+", 1 );
   }
 
   exit( EXIT_SUCCESS );

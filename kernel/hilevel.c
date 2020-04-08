@@ -18,7 +18,7 @@
  *   to execute.
  */
 
-pcb_t procTab[ MAX_PROCS ]; pcb_t* executing = NULL;
+pcb_t procTab[ MAX_PROCS ]; pcb_t* executing = NULL; uint32_t procCount = 0;
 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   char prev_pid = '?', next_pid = '?';
@@ -43,20 +43,43 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
 
   return;
 }
-
 void schedule( ctx_t* ctx ) {
-  if     ( executing->pid == procTab[ 0 ].pid ) {
-    dispatch( ctx, &procTab[ 0 ], &procTab[ 1 ] );  // context switch P_1 -> P_2
-
-    procTab[ 0 ].status = STATUS_READY;             // update   execution status  of P_1 
-    procTab[ 1 ].status = STATUS_EXECUTING;         // update   execution status  of P_2
+  // schedule the process with the higest priority score that is ready
+  pcb_t* prev; pcb_t* next;
+  uint8_t prevIdx, nextIdx;
+  uint8_t highest = 0;
+  for (int i = 0; i < procCount; i++){
+    if(procTab[i].pid == executing->pid){
+      prev = &procTab[i];
+      prevIdx = i;
+    }
+    if(procTab[i].status == STATUS_READY && procTab[i].priority > highest){
+      highest = procTab[i].priority;
+      next = &procTab[i];
+      nextIdx = i;
+    }
   }
-  else if( executing->pid == procTab[ 1 ].pid ) {
-    dispatch( ctx, &procTab[ 1 ], &procTab[ 0 ] );  // context switch P_2 -> P_1
-
-    procTab[ 1 ].status = STATUS_READY;             // update   execution status  of P_2
-    procTab[ 0 ].status = STATUS_EXECUTING;         // update   execution status  of P_1
+  // context switch to another process if exist one
+  if (next != NULL){
+    dispatch(ctx, prev, next);
+    if(prev != NULL){
+      procTab[prevIdx].status = STATUS_READY;
+    }
+    procTab[nextIdx].status = STATUS_EXECUTING;
   }
+
+  // if     ( executing->pid == procTab[ 0 ].pid ) {
+  //   dispatch( ctx, &procTab[ 0 ], &procTab[ 1 ] );  // context switch P_1 -> P_2
+
+  //   procTab[ 0 ].status = STATUS_READY;             // update   execution status  of P_1 
+  //   procTab[ 1 ].status = STATUS_EXECUTING;         // update   execution status  of P_2
+  // }
+  // else if( executing->pid == procTab[ 1 ].pid ) {
+  //   dispatch( ctx, &procTab[ 1 ], &procTab[ 0 ] );  // context switch P_2 -> P_1
+
+  //   procTab[ 1 ].status = STATUS_READY;             // update   execution status  of P_2
+  //   procTab[ 0 ].status = STATUS_EXECUTING;         // update   execution status  of P_1
+  // }
 
   return;
 }
@@ -90,6 +113,8 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   procTab[ 0 ].ctx.cpsr = 0x50;
   procTab[ 0 ].ctx.pc   = ( uint32_t )( &main_P1 );
   procTab[ 0 ].ctx.sp   = procTab[ 0 ].tos;
+  procTab[ 0 ].priority = 1;
+  procCount ++;
 
   memset( &procTab[ 1 ], 0, sizeof( pcb_t ) ); // initialise 1-st PCB = P_2
   procTab[ 1 ].pid      = 2;
@@ -98,13 +123,16 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   procTab[ 1 ].ctx.cpsr = 0x50;
   procTab[ 1 ].ctx.pc   = ( uint32_t )( &main_P2 );
   procTab[ 1 ].ctx.sp   = procTab[ 1 ].tos;
+  procTab[ 1 ].priority = 2;
+  procCount ++;
 
   /* Once the PCBs are initialised, we arbitrarily select the 0-th PCB to be 
    * executed: there is no need to preserve the execution context, since it 
    * is invalid on reset (i.e., no process was previously executing).
    */
 
-  dispatch( ctx, NULL, &procTab[ 0 ] );
+  schedule(ctx);
+  // dispatch( ctx, NULL, &procTab[ 0 ] );
 
   /* Configure the mechanism for interrupt handling by
    *

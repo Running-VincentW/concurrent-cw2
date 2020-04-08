@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "hilevel.h": "c",
-        "gic.h": "c"
+        "gic.h": "c",
+        "pl011.h": "c",
+        "time.h": "c"
     }
 }
