@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "hilevel.h": "c",
+        "gic.h": "c"
+    }
+}
