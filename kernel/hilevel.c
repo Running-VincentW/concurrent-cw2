@@ -45,7 +45,7 @@ void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
 }
 void schedule( ctx_t* ctx ) {
   // schedule the process with the higest priority score that is ready
-  pcb_t* prev; pcb_t* next;
+  pcb_t* prev = NULL; pcb_t* next = NULL;
   uint8_t prevIdx, nextIdx;
   uint8_t highest = 0;
   for (int i = 0; i < procCount; i++){
@@ -62,7 +62,7 @@ void schedule( ctx_t* ctx ) {
   // context switch to another process if exist one
   if (next != NULL){
     dispatch(ctx, prev, next);
-    if(prev != NULL){
+    if(prev != NULL && prev->status != STATUS_TERMINATED){
       procTab[prevIdx].status = STATUS_READY;
     }
     procTab[nextIdx].status = STATUS_EXECUTING;
@@ -88,6 +88,8 @@ extern void     main_P1();
 extern uint32_t tos_P1;
 extern void     main_P2(); 
 extern uint32_t tos_P2;
+extern void     main_console(); 
+extern uint32_t tos_console;
 
 void hilevel_handler_rst( ctx_t* ctx              ) { 
   /* Invalidate all entries in the process table, so it's clear they are not
@@ -113,17 +115,27 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   procTab[ 0 ].ctx.cpsr = 0x50;
   procTab[ 0 ].ctx.pc   = ( uint32_t )( &main_P1 );
   procTab[ 0 ].ctx.sp   = procTab[ 0 ].tos;
-  procTab[ 0 ].priority = 1;
+  procTab[ 0 ].priority = 2;
   procCount ++;
 
   memset( &procTab[ 1 ], 0, sizeof( pcb_t ) ); // initialise 1-st PCB = P_2
   procTab[ 1 ].pid      = 2;
-  procTab[ 1 ].status   = STATUS_READY;
+  procTab[ 1 ].status   = STATUS_INVALID;
   procTab[ 1 ].tos      = ( uint32_t )( &tos_P2  );
   procTab[ 1 ].ctx.cpsr = 0x50;
   procTab[ 1 ].ctx.pc   = ( uint32_t )( &main_P2 );
   procTab[ 1 ].ctx.sp   = procTab[ 1 ].tos;
-  procTab[ 1 ].priority = 2;
+  procTab[ 1 ].priority = 1;
+  procCount ++;
+
+  memset( &procTab[ 2 ], 0, sizeof( pcb_t ) ); // initialise 2-nd PCB = Console
+  procTab[ 2 ].pid      = 3;
+  procTab[ 2 ].status   = STATUS_READY;
+  procTab[ 2 ].tos      = ( uint32_t )( &tos_console  );
+  procTab[ 2 ].ctx.cpsr = 0x50;
+  procTab[ 2 ].ctx.pc   = ( uint32_t )( &main_console );
+  procTab[ 2 ].ctx.sp   = procTab[ 2 ].tos;
+  procTab[ 2 ].priority = -1;
   procCount ++;
 
   /* Once the PCBs are initialised, we arbitrarily select the 0-th PCB to be 
@@ -189,7 +201,29 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
       break;
     }
+    case 0x03 : { // 0x03 => fork
+      uint32_t c = procCount ++;
+      if(c == 0){
+        ctx->gpr[ 0 ] = 0; //todo: do something to claim sys resources back
+      }
+      else{
+        memset( &procTab[ c ], 0, sizeof( pcb_t ) );
+        procTab[c].ctx = *ctx;
+        procTab[c].ctx.gpr[ 0 ] = 0;
+        procTab[c].pid      = c + 1;
+        procTab[c].tos = executing->tos;
+        procTab[c].priority = executing->priority;
+        procTab[c].status = STATUS_READY;
 
+        ctx->gpr[ 0 ] = procTab[c].pid;
+      }
+      break;
+    }
+    case 0x04: { // 0x04 => exit
+      executing->status = STATUS_TERMINATED;
+      schedule( ctx );
+      break;
+    }
     default   : { // 0x?? => unknown/unsupported
       break;
     }

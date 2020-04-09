@@ -85,6 +85,7 @@ void* load( char* x ) {
  */
 
 void main_console() {
+  write(STDOUT_FILENO, "success", 7);
   while( 1 ) {
     char cmd[ MAX_CMD_CHARS ];
 

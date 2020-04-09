@@ -28,4 +28,7 @@ SECTIONS {
   /* allocate stack for P2           */
   .       = . + 0x00001000;  
   tos_P2  = .;
+  /* allocate stack for Console           */
+  .       = . + 0x00001000;  
+  tos_console  = .;
 }
