@@ -64,6 +64,11 @@ typedef enum {
 } status_t;
 
 typedef struct {
+  processType_t  type;
+       uint32_t order;
+}scheduler_t;
+
+typedef struct {
   uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
 } ctx_t;
 
@@ -72,7 +77,7 @@ typedef struct {
   status_t   status; // current status
   uint32_t      tos; // address of Top of Stack (ToS)
      ctx_t      ctx; // execution context
-   uint8_t priority;
+   scheduler_t schedule; // scheduler info
 } pcb_t;
 
 #endif
