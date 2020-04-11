@@ -47,6 +47,7 @@
 
 typedef int pid_t;
 
+#define PROCESS_TYPES 2
 typedef enum{
   PROCESS_USR,
   PROCESS_IO
@@ -65,7 +66,7 @@ typedef enum {
 
 typedef struct {
   processType_t  type;
-       uint32_t order;
+       uint32_t lastExec;
 }scheduler_t;
 
 typedef struct {

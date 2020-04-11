@@ -20,7 +20,9 @@
 pcb_t procTab[MAX_PROCS];
 pcb_t *executing = NULL;
 uint32_t procCount = 0;
+uint32_t ticker = 0;
 uint32_t sp;
+processType_t schedulerProcessType;
 
 void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
 {
@@ -48,36 +50,64 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
 
   return;
 }
+
 void schedule(ctx_t *ctx)
 {
-  // schedule the process with the higest priority score that is ready
   pcb_t *prev = NULL;
   pcb_t *next = NULL;
-  uint8_t prevIdx, nextIdx;
-  uint8_t highest = 0;
+
+  // find prev PIB
   for (int i = 0; i < procCount; i++)
   {
     if (procTab[i].pid == executing->pid)
     {
       prev = &procTab[i];
-      prevIdx = i;
-    }
-    if (procTab[i].status == STATUS_READY && procTab[i].priority > highest)
-    {
-      highest = procTab[i].priority;
-      next = &procTab[i];
-      nextIdx = i;
     }
   }
+  if(prev != NULL){
+    prev->schedule.lastExec = ticker;
+  }
+  // find the processes that have been waiting for longest
+  uint32_t oldest[PROCESS_TYPES];
+  for (int i = 0; i < PROCESS_TYPES; i++)
+  {
+    oldest[i] = -1;
+  }
+  pcb_t *oldestPcb[PROCESS_TYPES];
+  bool processExist[PROCESS_TYPES] = {false};
+  for (int i = 0; i < procCount; i++)
+  {
+    pcb_t *ith = &procTab[i];
+    if (ith->status == STATUS_READY &&
+        ith->schedule.lastExec < oldest[ith->schedule.type])
+    {
+      oldest[ith->schedule.type] = ith->schedule.lastExec;
+      oldestPcb[ith->schedule.type] = ith;
+      processExist[ith->schedule.type] = true;
+    }
+  }
+
+  for (int offset = 0; offset < PROCESS_TYPES; offset++)
+  {
+    int target = (schedulerProcessType + offset) % PROCESS_TYPES;
+    if (processExist[target])
+    {
+      next = oldestPcb[target];
+      break;
+    }
+  }
+
   // context switch to another process if exist one
   if (next != NULL)
   {
     dispatch(ctx, prev, next);
     if (prev != NULL && prev->status != STATUS_TERMINATED)
     {
-      procTab[prevIdx].status = STATUS_READY;
+      prev->status = STATUS_READY;
     }
-    procTab[nextIdx].status = STATUS_EXECUTING;
+    next->status = STATUS_EXECUTING;
+    // next->schedule.lastExec = ticker;
+    schedulerProcessType = (next->schedule.type + 1) % PROCESS_TYPES;
   }
 
   return;
@@ -118,7 +148,8 @@ void hilevel_handler_rst(ctx_t *ctx)
   procTab[0].ctx.cpsr = 0x50;
   procTab[0].ctx.pc = (uint32_t)(&main_P1);
   procTab[0].ctx.sp = procTab[0].tos;
-  procTab[0].priority = 2;
+  procTab[0].schedule.type = PROCESS_USR;
+  procTab[0].schedule.lastExec = 0;
   procCount++;
 
   memset(&procTab[1], 0, sizeof(pcb_t)); // initialise 1-st PCB = P_2
@@ -128,7 +159,8 @@ void hilevel_handler_rst(ctx_t *ctx)
   procTab[1].ctx.cpsr = 0x50;
   procTab[1].ctx.pc = (uint32_t)(&main_P2);
   procTab[1].ctx.sp = procTab[1].tos;
-  procTab[1].priority = 1;
+  procTab[1].schedule.type = PROCESS_USR;
+  procTab[1].schedule.lastExec = 0;
   procCount++;
 
   memset(&procTab[2], 0, sizeof(pcb_t)); // initialise 2-nd PCB = Console
@@ -138,7 +170,8 @@ void hilevel_handler_rst(ctx_t *ctx)
   procTab[2].ctx.cpsr = 0x50;
   procTab[2].ctx.pc = (uint32_t)(&main_console);
   procTab[2].ctx.sp = procTab[2].tos;
-  procTab[2].priority = -1;
+  procTab[2].schedule.type = PROCESS_IO;
+  procTab[2].schedule.lastExec = 0;
   procCount++;
 
   /* Once the PCBs are initialised, we arbitrarily select the 0-th PCB to be 
@@ -146,6 +179,7 @@ void hilevel_handler_rst(ctx_t *ctx)
    * is invalid on reset (i.e., no process was previously executing).
    */
 
+  schedulerProcessType = PROCESS_IO;
   schedule(ctx);
   // dispatch( ctx, NULL, &procTab[ 0 ] );
 
@@ -171,9 +205,8 @@ void hilevel_handler_rst(ctx_t *ctx)
 
   int_enable_irq();
   PL011_putc(UART0, 'K', true);
-
+  
   sp = (uint32_t)&_stack_end;
-
   return;
 }
 void exec_(ctx_t *ctx)
@@ -191,7 +224,8 @@ void fork_(ctx_t *ctx)
   procTab[c].ctx.gpr[0] = 0;
   procTab[c].pid = c + 1;
   procTab[c].status = STATUS_READY;
-  procTab[c].priority = executing->priority;
+  procTab[c].schedule = executing->schedule;
+  // procTab[c].priority = executing->priority;
 
   // Create segment in stack memory, and copy relevant memory
   procTab[c].tos = sp;
@@ -272,6 +306,7 @@ void hilevel_handler_irq(ctx_t *ctx)
   // Step 4: handle the interrupt to perform a context switch, then reset the timer.
   if (id == GIC_SOURCE_TIMER0)
   {
+    ticker ++;
     schedule(ctx);
     TIMER0->Timer1IntClr = 0x01;
   }
