@@ -19,6 +19,7 @@
  */
 
 pcb_t procTab[ MAX_PROCS ]; pcb_t* executing = NULL; uint32_t procCount = 0;
+uint32_t sp;
 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next ) {
   char prev_pid = '?', next_pid = '?';
@@ -68,19 +69,6 @@ void schedule( ctx_t* ctx ) {
     procTab[nextIdx].status = STATUS_EXECUTING;
   }
 
-  // if     ( executing->pid == procTab[ 0 ].pid ) {
-  //   dispatch( ctx, &procTab[ 0 ], &procTab[ 1 ] );  // context switch P_1 -> P_2
-
-  //   procTab[ 0 ].status = STATUS_READY;             // update   execution status  of P_1 
-  //   procTab[ 1 ].status = STATUS_EXECUTING;         // update   execution status  of P_2
-  // }
-  // else if( executing->pid == procTab[ 1 ].pid ) {
-  //   dispatch( ctx, &procTab[ 1 ], &procTab[ 0 ] );  // context switch P_2 -> P_1
-
-  //   procTab[ 1 ].status = STATUS_READY;             // update   execution status  of P_2
-  //   procTab[ 0 ].status = STATUS_EXECUTING;         // update   execution status  of P_1
-  // }
-
   return;
 }
 
@@ -90,6 +78,8 @@ extern void     main_P2();
 extern uint32_t tos_P2;
 extern void     main_console(); 
 extern uint32_t tos_console;
+extern uint32_t _stack_start;
+extern uint32_t _stack_end;
 
 void hilevel_handler_rst( ctx_t* ctx              ) { 
   /* Invalidate all entries in the process table, so it's clear they are not
@@ -169,7 +159,34 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   int_enable_irq();
   PL011_putc(UART0, 'K', true);
 
+  sp = (uint32_t)&_stack_end;
+
   return;
+}
+void exec_(ctx_t* ctx){
+  ctx->sp = executing->tos;
+  ctx->pc = ctx->gpr[0];
+}
+void fork_(ctx_t* ctx){
+  // Create a PCB entry with same ctx but unique pid
+  // TODO: do something to claim sys resources back
+  uint32_t c = procCount ++;
+  memset( &procTab[ c ], 0, sizeof( pcb_t ) );
+  procTab[c].ctx          = *ctx;
+  procTab[c].ctx.gpr[ 0 ] = 0;
+  procTab[c].pid          = c + 1;
+  procTab[c].status       = STATUS_READY;
+  procTab[c].priority     = executing->priority;
+
+  // Create segment in stack memory, and copy relevant memory
+  procTab[c].tos    = sp; sp -= STACK_SIZE;
+  memcpy((uint32_t*)(procTab[c].tos - STACK_SIZE), (uint32_t*)(executing->tos - STACK_SIZE), STACK_SIZE);
+  procTab[c].ctx.sp = procTab[c].tos - executing->tos + ctx->sp;
+  // uint32_t sBytes   = ctx->sp - executing->ctx.sp;
+  // procTab[c].ctx.sp = procTab[c].tos + sBytes;
+  // memcpy((uint32_t*)procTab[c].tos, (uint32_t*)executing->ctx.sp, sBytes);
+
+  ctx->gpr[ 0 ] = procTab[c].pid;
 }
 
 void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) { 
@@ -202,26 +219,16 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       break;
     }
     case 0x03 : { // 0x03 => fork
-      uint32_t c = procCount ++;
-      if(c == 0){
-        ctx->gpr[ 0 ] = 0; //todo: do something to claim sys resources back
-      }
-      else{
-        memset( &procTab[ c ], 0, sizeof( pcb_t ) );
-        procTab[c].ctx = *ctx;
-        procTab[c].ctx.gpr[ 0 ] = 0;
-        procTab[c].pid      = c + 1;
-        procTab[c].tos = executing->tos;
-        procTab[c].priority = executing->priority;
-        procTab[c].status = STATUS_READY;
-
-        ctx->gpr[ 0 ] = procTab[c].pid;
-      }
+      fork_(ctx);
       break;
     }
     case 0x04: { // 0x04 => exit
       executing->status = STATUS_TERMINATED;
       schedule( ctx );
+      break;
+    }
+    case 0x05: { // 0x05 => exec( add )
+      exec_(ctx);
       break;
     }
     default   : { // 0x?? => unknown/unsupported

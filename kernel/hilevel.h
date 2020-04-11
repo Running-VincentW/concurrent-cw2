@@ -43,8 +43,14 @@
 
 #define MAX_PROCS 2
 #define TIMER0_INTERVAL 0x00100000
+#define STACK_SIZE 0x00001000
 
 typedef int pid_t;
+
+typedef enum{
+  PROCESS_USR,
+  PROCESS_IO
+} processType_t;
 
 typedef enum { 
   STATUS_INVALID,

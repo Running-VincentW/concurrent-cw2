@@ -7,6 +7,8 @@
 
 #include "P1.h"
 
+extern void main_P2(); 
+
 void main_P1() {
   // while( 1 ) {
   //   write( STDOUT_FILENO, "+", 1 );
@@ -18,6 +20,7 @@ void main_P1() {
   }
   else if (pid == 0){
     write(STDOUT_FILENO, "child", 5);
+    // exec(&main_P2);
   }
 
   exit( EXIT_SUCCESS );

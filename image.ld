@@ -31,4 +31,10 @@ SECTIONS {
   /* allocate stack for Console           */
   .       = . + 0x00001000;  
   tos_console  = .;
+  /* allocate stack for Dynamic           */
+  .stack : {
+    _stack_start = .;
+    .            = . + 0x0000A000;
+    _stack_end   = .;
+  }
 }

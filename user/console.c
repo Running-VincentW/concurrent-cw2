@@ -39,6 +39,8 @@ extern void main_P4();
 extern void main_P5(); 
 
 void* load( char* x ) {
+  PL011_putc( UART1, x[ 0 ], true );
+  PL011_putc( UART1, x[ 1 ], true );
   if     ( 0 == strcmp( x, "P3" ) ) {
     return &main_P3;
   }
@@ -85,13 +87,12 @@ void* load( char* x ) {
  */
 
 void main_console() {
-  write(STDOUT_FILENO, "success", 7);
   while( 1 ) {
     char cmd[ MAX_CMD_CHARS ];
 
     // step 1: write command prompt, then read command.
 
-    puts( "console$ ", 7 ); gets( cmd, MAX_CMD_CHARS );
+    puts( "console$ ", 9 ); gets( cmd, MAX_CMD_CHARS );
 
     // step 2: tokenize command.
 
