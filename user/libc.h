@@ -74,4 +74,21 @@ extern int  kill( pid_t pid, int x );
 // for process identified by pid, set  priority to x
 extern void nice( pid_t pid, int x );
 
+typedef uint32_t sem_t;
+
+// initialize an unnamed semaphore
+extern void sem_init(sem_t *sem, unsigned value);
+// lock a semaphore
+extern void sem_wait(sem_t *sem);
+// unlock a semaphore
+extern void sem_post(sem_t *sem);
+// destroy a semaphore
+extern void sem_destroy(sem_t *sem);
+
+// sleep for debugging
+extern void sleep(int sec);
+
+// for shared memory
+
+
 #endif
