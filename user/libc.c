@@ -147,3 +147,115 @@ void nice( int pid, int x ) {
 
   return;
 }
+
+void sem_init(sem_t *sem, unsigned value)
+{
+  *sem = value;
+  return;
+}
+
+void sem_post(sem_t *sem)
+{
+  asm volatile("ldrex     r1, [ r0 ] \n" // assign r1 = x
+               "add   r1, r1, #1   \n"   // r1 = r1 + 1
+               "strex r2, r1, [ r0 ] \n" // r2 <= x == r1
+               "cmp   r2, #0       \n"   //    r ?= 0
+               "bne   sem_post     \n"   // if r != 0, retry
+               "dmb                \n"   // memory barrier
+               "bx    lr           \n"   // return
+               :
+               : "r"(sem)
+               : "r0", "r1", "r2");
+  return;
+}
+
+void sem_wait(sem_t *x)
+{
+  asm volatile("ldrex     r1, [ %0 ] \n" // assign r1 = sem
+               "cmp   r1, #0         \n" //    r1 ?= 0
+               "beq   sem_wait       \n" // if r1 == 0, retry
+               "sub   r1, r1, #1     \n" // r1 = r1 - 1
+               "strex r2, r1, [ %0 ] \n" // r <= sem == r1
+               "cmp   r2, #0         \n" //    r ?= 0
+               "bne   sem_wait       \n" // if r != 0, retry
+               "dmb                  \n" // memory barrier
+               "bx    lr             \n" // return
+               :
+               : "r"(x)
+               : "r0", "r1", "r2");
+  return;
+}
+
+void sem_destroy(sem_t *sem)
+{
+  //FIXME: I doesn't work.
+  while (*sem != 0)
+  {
+    asm volatile("nop");
+  }
+  return;
+}
+
+void sleep(int sec)
+{
+  for (uint32_t i = 0; i < (0x02000000) * sec; i++)
+  {
+    asm volatile("nop");
+  }
+  return;
+}
+
+int shm_open(const char *name){
+  int r;
+  asm volatile( "mov r0, %2 \n" // assign r0 = name
+                "svc %1     \n" // make system call
+                "mov %0, r0 \n" // assign r = r0
+              : "=r" (r)
+              : "I" (SYS_SHM_OPEN), "r" (name)
+              : "r0" );
+  return r;
+};
+int shm_unlink(const char *name){
+  int r;
+  asm volatile( "mov r0, %2 \n" // assign r0 = name
+                "svc %1     \n" // make system call
+                "mov %0, r0 \n" // assign r = r0
+              : "=r" (r)
+              : "I" (SYS_SHM_UNLINK), "r" (name)
+              : "r0" );
+  return r;
+};
+typedef uint32_t off_t; //TODO: check if type valid
+int ftruncate(int fildes, off_t length){
+  int r;
+  asm volatile( "mov r0, %2 \n" // assign r0 = fildes
+                "mov r1, %3 \n" // assign r1 = length
+                "svc %1     \n" // make system call
+                "mov %0, r0 \n" // assign r = r0
+              : "=r" (r)
+              : "I" (SYS_FTRUNCATE), "r" (fildes), "r" (length)
+              : "r0", "r1" );
+  return r;
+};
+void *mmap(void *addr, size_t len){
+  uint32_t *p;
+  asm volatile( "mov r0, %2 \n" // assign r0 = addr
+                "mov r1, %3 \n" // assign r1 = len
+                "svc %1     \n" // make system call
+                "mov %0, r0 \n" // assign r = r0
+              : "=r" (p)
+              : "I" (SYS_MMAP), "r" (addr), "r" (len)
+              : "r0", "r1" );
+  return p;
+};
+int munmap(void *addr, size_t len){
+  int r;
+  asm volatile( "mov r0, %2 \n" // assign r0 = fildes
+                "mov r1, %3 \n" // assign r1 = length
+                "svc %1     \n" // make system call
+                "mov %0, r0 \n" // assign r = r0
+              : "=r" (r)
+              : "I" (SYS_FTRUNCATE), "r" (addr), "r" (len)
+              : "r0", "r1" );
+  return r;
+};

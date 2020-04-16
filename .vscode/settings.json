@@ -4,6 +4,13 @@
         "gic.h": "c",
         "pl011.h": "c",
         "time.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "libc.h": "c",
+        "semaphore.h": "c",
+        "malloc.h": "c",
+        "stdint.h": "c",
+        "unistd.h": "c",
+        "stdio.h": "c",
+        "p1.h": "c"
     }
 }

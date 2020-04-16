@@ -41,7 +41,7 @@
  * - a type that captures a process PCB.
  */
 
-#define MAX_PROCS 2
+#define MAX_PROCS 10
 #define TIMER0_INTERVAL 0x00100000
 #define STACK_SIZE 0x00001000
 
