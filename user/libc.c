@@ -207,8 +207,8 @@ void sleep(int sec)
 
 int shm_open(const char *name){
   int r;
-  asm volatile( "mov r0, %1 \n" // assign r0 = name
-                "svc %0     \n" // make system call
+  asm volatile( "mov r0, %2 \n" // assign r0 = name
+                "svc %1     \n" // make system call
                 "mov %0, r0 \n" // assign r = r0
               : "=r" (r)
               : "I" (SYS_SHM_OPEN), "r" (name)
@@ -217,8 +217,8 @@ int shm_open(const char *name){
 };
 int shm_unlink(const char *name){
   int r;
-  asm volatile( "mov r0, %1 \n" // assign r0 = name
-                "svc %0     \n" // make system call
+  asm volatile( "mov r0, %2 \n" // assign r0 = name
+                "svc %1     \n" // make system call
                 "mov %0, r0 \n" // assign r = r0
               : "=r" (r)
               : "I" (SYS_SHM_UNLINK), "r" (name)
@@ -239,9 +239,9 @@ int ftruncate(int fildes, off_t length){
 };
 void *mmap(void *addr, size_t len){
   uint32_t *p;
-  asm volatile( "mov r0, %1 \n" // assign r0 = addr
-                "mov r1, %2 \n" // assign r1 = len
-                "svc %0     \n" // make system call
+  asm volatile( "mov r0, %2 \n" // assign r0 = addr
+                "mov r1, %3 \n" // assign r1 = len
+                "svc %1     \n" // make system call
                 "mov %0, r0 \n" // assign r = r0
               : "=r" (p)
               : "I" (SYS_MMAP), "r" (addr), "r" (len)
