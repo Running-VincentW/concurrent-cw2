@@ -38,6 +38,11 @@ typedef int pid_t;
 #define SYS_EXEC      ( 0x05 )
 #define SYS_KILL      ( 0x06 )
 #define SYS_NICE      ( 0x07 )
+#define SYS_SHM_OPEN  ( 0x08 )
+#define SYS_FTRUNCATE ( 0x09 )
+#define SYS_MMAP      ( 0x0A )
+#define SYS_MUNMAP    ( 0x0B )
+#define SYS_SHM_UNLINK ( 0x0C )
 
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )
@@ -75,7 +80,6 @@ extern int  kill( pid_t pid, int x );
 extern void nice( pid_t pid, int x );
 
 typedef uint32_t sem_t;
-
 // initialize an unnamed semaphore
 extern void sem_init(sem_t *sem, unsigned value);
 // lock a semaphore
@@ -89,6 +93,18 @@ extern void sem_destroy(sem_t *sem);
 extern void sleep(int sec);
 
 // for shared memory
-
+typedef uint32_t off_t;
+// open a shared memory object
+// extern int shm_open(const char *name, int oflag, mode_t mode);
+extern int shm_open(const char *name);
+// remove a shared memory object
+extern int shm_unlink(const char *name);
+// truncate a file to a specified length (p.961)
+extern int ftruncate(int fildes, off_t length);
+// map pages of memory
+extern void *mmap(void *addr, size_t len);
+// extern void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off);
+// unmap pages of memory
+extern int munmap(void *addr, size_t len);
 
 #endif
