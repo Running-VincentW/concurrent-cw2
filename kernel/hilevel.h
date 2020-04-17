@@ -44,6 +44,8 @@
 #define MAX_PROCS 10
 #define TIMER0_INTERVAL 0x00100000
 #define STACK_SIZE 0x00001000
+#define OPEN_MAX 10
+#define OFD_MAX 25
 
 typedef int pid_t;
 
@@ -73,12 +75,24 @@ typedef struct {
   uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
 } ctx_t;
 
+// open file descriptors
+typedef struct{
+  bool active;
+  char name[10];
+  uint32_t *object;
+  uint32_t bytes;
+  // file offset, file status, file access modes
+} ofd_t;
+
 typedef struct {
      pid_t      pid; // Process IDentifier (PID)
   status_t   status; // current status
   uint32_t      tos; // address of Top of Stack (ToS)
      ctx_t      ctx; // execution context
    scheduler_t schedule; // scheduler info
+   ofd_t *fd[OPEN_MAX];
+   bool fdActive[OPEN_MAX];
+   uint8_t fdCount;
 } pcb_t;
 
 #endif

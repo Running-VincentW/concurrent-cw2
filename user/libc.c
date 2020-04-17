@@ -52,6 +52,16 @@ void itoa( char* r, int x ) {
   return;
 }
 
+long pow(int base, int exp)
+{
+    int r = 1;
+    for (exp; exp > 0; exp--)
+    {
+        r = r * base;
+    }
+    return r;
+}
+
 void yield() {
   asm volatile( "svc %0     \n" // make system call SYS_YIELD
               :
