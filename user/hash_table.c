@@ -1,9 +1,9 @@
 /**
- * A hashtable that maps strings to int
- * 
- * This implemenation of the hashtable is made available
- * from the tutorial by James Routley under MIT license.
+ * This hashtable is referenced and copyrighted to the original author
+ * James Routley, in write-a-hash-table repository, under MIT license.
  * https://github.com/jamesroutley/write-a-hash-table/
+ * Modifications made to map strings to integers instead,
+ * as well as to replace some code that requires <math.h>.
 **/
 
 #include "hash_table.h"
