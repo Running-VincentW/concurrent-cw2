@@ -3,6 +3,7 @@
 // #include <pthread.h> 
 // #include <semaphore.h> 
 #include "libc.h"
+#include "hash_table.h"
 
 sem_t mutex = 0; 
 
@@ -24,20 +25,9 @@ sem_t mutex = 0;
 
 void main_P6() 
 { 
-	// sem_init(&mutex, 0, 0); 
-    sem_wait(&mutex);
-	// int s = fork();
-    // if(s == 0){
-    //     s = fork();
-    //     if(s == 0){
-    //         sleep(2);
-    //         thread(s);
-    //     }
-    //     else{
-    //         thread(s);
-    //     }
-    // }
-	// sleep(2);
-	// sem_destroy(&mutex); 
+    ht_hash_table* ht  = ht_new();
+    // ht_del_hash_table(ht);
+    ht_insert(ht, "test", 123);
+    int a = ht_search(ht, "test");
 	exit( EXIT_SUCCESS );
 } 

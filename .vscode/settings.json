@@ -11,6 +11,11 @@
         "stdint.h": "c",
         "unistd.h": "c",
         "stdio.h": "c",
-        "p1.h": "c"
+        "p1.h": "c",
+        "stdlib.h": "c",
+        "hashtable.h": "c",
+        "math.h": "c",
+        "hash_table.h": "c",
+        "xmalloc.h": "c"
     }
 }

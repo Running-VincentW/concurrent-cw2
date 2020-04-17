@@ -59,6 +59,8 @@ extern int  atoi( char* x        );
 // convert integer x into ASCII string r
 extern void itoa( char* r, int x );
 
+extern long pow( int base, int exponent );
+
 // cooperatively yield control of processor, i.e., invoke the scheduler
 extern void yield();
 

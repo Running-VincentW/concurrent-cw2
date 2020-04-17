@@ -18,6 +18,8 @@
  */
 
 pcb_t procTab[MAX_PROCS];
+ofd_t openFd[OFD_MAX];
+uint32_t openFdCount = 0;
 pcb_t *executing = NULL;
 uint32_t procCount = 0;
 uint32_t ticker = 0;
@@ -213,6 +215,9 @@ void exec_(ctx_t *ctx)
 {
   ctx->sp = executing->tos;
   ctx->pc = ctx->gpr[0];
+  // resets the file descriptor
+  executing->fdCount = 0;
+  memset(&executing->fdActive, 0, sizeof(executing->fdActive));
 }
 void fork_(ctx_t *ctx)
 {
@@ -237,6 +242,13 @@ void fork_(ctx_t *ctx)
   // memcpy((uint32_t*)procTab[c].tos, (uint32_t*)executing->ctx.sp, sBytes);
 
   ctx->gpr[0] = procTab[c].pid;
+}
+ofd_t *createOfd(const char *name){
+  uint32_t c = openFdCount++;
+  memset(&openFd[c], 0, sizeof(ofd_t));
+  openFd[c].active = true;
+  strcpy(openFd[c].name, name);
+  return &openFd[c];
 }
 
 void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
@@ -286,6 +298,37 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   case 0x05:
   { // 0x05 => exec( add )
     exec_(ctx);
+    break;
+  }
+  case 0x08:
+  { // shmopen(name)
+  int fd;
+    if(executing->fdCount == OPEN_MAX){
+      fd = -1;
+    }
+    else{
+      for(int i = 0; i < OPEN_MAX; i++){
+        if(executing->fdActive[i] == false){
+          fd = i;
+        }
+      }
+    }
+    break;
+  }
+  case 0x09:
+  { // ftruncate (fd, len)
+    break;
+  }
+  case 0x0A:
+  {  // mmap (addr, len)
+    break;
+  }
+  case 0x0B:
+  { // munmap (addr, len)
+    break;
+  }
+  case 0x0C:
+  { // shm_unlink (name)
     break;
   }
   default:
