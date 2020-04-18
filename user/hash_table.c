@@ -2,7 +2,7 @@
  * This hashtable is referenced and copyrighted to the original author
  * James Routley, in write-a-hash-table repository, under MIT license.
  * https://github.com/jamesroutley/write-a-hash-table/
- * Modifications made to map strings to integers instead,
+ * Modifications are made to map strings to integers instead,
  * as well as to replace some code that requires <math.h>.
 **/
 
@@ -170,7 +170,7 @@ void ht_insert(ht_hash_table* ht, const char* key, int value) {
 
 
 /*
- * Returns the value associated with 'key', or NULL if the key doesn't exist
+ * Returns the value associated with 'key', or 0 if the key doesn't exist
  */
 int ht_search(ht_hash_table* ht, const char* key) {
     int index = ht_hash(key, ht->size, 0);
@@ -184,7 +184,7 @@ int ht_search(ht_hash_table* ht, const char* key) {
         item = ht->items[index];
         i++;
     } 
-    return NULL;
+    return 0;
 }
 
 

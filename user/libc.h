@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 // Define a type that that captures a Process IDentifier (PID).
 
@@ -66,6 +67,7 @@ extern void yield();
 
 // write n bytes from x to   the file descriptor fd; return bytes written
 extern int write( int fd, const void* x, size_t n );
+// extern int writes( int fd, const void* x );
 // read  n bytes into x from the file descriptor fd; return bytes read
 extern int  read( int fd,       void* x, size_t n );
 
@@ -104,7 +106,7 @@ extern int shm_unlink(const char *name);
 // truncate a file to a specified length (p.961)
 extern int ftruncate(int fildes, off_t length);
 // map pages of memory
-extern void *mmap(void *addr, size_t len);
+extern void *mmap(int fildes);
 // extern void *mmap(void *addr, size_t len, int prot, int flags, int fildes, off_t off);
 // unmap pages of memory
 extern int munmap(void *addr, size_t len);

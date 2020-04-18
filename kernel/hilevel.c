@@ -6,6 +6,7 @@
  */
 
 #include "hilevel.h"
+#include "hash_table.h"
 
 /* We assume there will be two user processes, stemming from execution of the 
  * two user programs P1 and P2, and can therefore
@@ -25,6 +26,7 @@ uint32_t procCount = 0;
 uint32_t ticker = 0;
 uint32_t sp;
 processType_t schedulerProcessType;
+ht_hash_table *ofd_ht;
 
 void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
 {
@@ -183,7 +185,10 @@ void hilevel_handler_rst(ctx_t *ctx)
 
   schedulerProcessType = PROCESS_IO;
   schedule(ctx);
+  ofd_ht = ht_new();
   // dispatch( ctx, NULL, &procTab[ 0 ] );
+
+  // initialise the open file descriptors hashtable
 
   /* Configure the mechanism for interrupt handling by
    *
@@ -302,33 +307,136 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   }
   case 0x08:
   { // shmopen(name)
-  int fd;
     if(executing->fdCount == OPEN_MAX){
-      fd = -1;
+      // file descriptor exceeded max limit
+      ctx->gpr[0] = -1;
     }
     else{
+      int fdIdx;
+      // create a fd for the PCB
       for(int i = 0; i < OPEN_MAX; i++){
         if(executing->fdActive[i] == false){
-          fd = i;
+          fdIdx = i;
+          break;
         }
+      }
+      bool new = false;
+      ofd_t *ofd = NULL;
+      // lookup the open file descriptor by name
+      int val = ht_search(ofd_ht, (char*)ctx->gpr[0]);
+      if(val != 0){
+        ofd = (ofd_t*) val;
+      }
+      else if (openFdCount < OFD_MAX){
+        // if not found, create a open file descriptor
+        new = true;
+        for(int i = 0; i < OFD_MAX; i++){
+          if(openFd[i].active == false){
+            ofd = &openFd[i];
+            break;
+          }
+        }
+      }
+      if(ofd != NULL){
+        if(new == true){
+          // initialize an ofd
+          memset(ofd, 0, sizeof(ofd_t));
+          strcpy(ofd->name, (char*)ctx->gpr[0]);
+          ofd->active = true;
+          ofd->bytes = 0;
+          ofd->object = NULL;
+          // create entry in hashtable lookup
+          ht_insert(ofd_ht, (char*)ctx->gpr[0], (uint32_t)ofd);
+        }
+        // update fd
+        executing->fdActive[fdIdx] = true;
+        executing->fd[fdIdx] = ofd;
+        // return fd
+        ctx->gpr[0] = fdIdx;
+      }
+      else{
+        ctx->gpr[0] = -1;
       }
     }
     break;
   }
   case 0x09:
   { // ftruncate (fd, len)
+    // find ofd of fd
+
+    // check if valid FD
+    if(executing->fdActive[ctx->gpr[0]] == false){
+      ctx->gpr[0] = -1;
+    }
+    else{
+      // check if we need to realloc or malloc a shared memory object
+      ofd_t* ofd = executing->fd[ctx->gpr[0]];
+      void* ptr;
+      uint32_t size = ctx->gpr[1];
+      if(ofd->object == NULL){ // create a memory shared object
+        ptr = malloc(size);
+      }
+      else if(ofd->object != NULL && size != ofd->bytes){ // resize the shared memory object
+        ptr = malloc(size);
+        if(size < ofd->bytes){
+          memcpy(ptr, ofd->object, size);
+        }
+        else{
+          memcpy(ptr, ofd->object, ofd->bytes);
+        }
+      }
+      else{ // keep the shared memory object
+        ptr = ofd->object;
+      }
+      if(ptr != NULL){
+        if(ptr != ofd->object){
+          free(ofd->object);
+        }
+        ofd->object = ptr;
+        ofd->bytes = size;
+        ctx->gpr[0] = 0;
+      }
+      else{
+        ctx->gpr[0] = -1;
+      }
+    }
     break;
   }
   case 0x0A:
-  {  // mmap (addr, len)
+  {  // mmap (fd)
+    if(executing->fdActive[ctx->gpr[0]]){
+      ofd_t *ofd = executing->fd[ctx->gpr[0]];
+      ctx->gpr[0] = (uint32_t) ofd->object;
+      //TODO: store attach info
+    }
+    else{
+      ctx->gpr[0] = 0;
+    }
     break;
   }
   case 0x0B:
   { // munmap (addr, len)
+    // TODO: we need to be able to dettach the process from a shared memory object
     break;
   }
   case 0x0C:
   { // shm_unlink (name)
+    uint32_t r = ht_search(ofd_ht, (char*) ctx->gpr[0]);
+    if(r == 0){
+      ctx->gpr[0] = -1;
+    }
+    else{
+      // TODO: check if any process is still mapped to it...
+      ofd_t *ofd = (ofd_t*) r;
+      // remove the shared memory object from heap mem
+      free(ofd->object);
+      // set ofd to unactive so that we can reuse it
+      ofd->active = false;
+      // remove the hashtable entry that maps the name to the ofd
+      ht_delete(ofd_ht, (char*) ctx->gpr[0]);
+      ctx->gpr[0] = 0;
+    }
+
     break;
   }
   default:

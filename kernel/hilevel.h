@@ -76,6 +76,7 @@ typedef struct {
 } ctx_t;
 
 // open file descriptors
+// the ofd only support type shared memory object
 typedef struct{
   bool active;
   char name[10];
