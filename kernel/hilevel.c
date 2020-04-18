@@ -307,8 +307,8 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   }
   case 0x08:
   { // shmopen(name)
-    if(executing->fdCount == OPEN_MAX || openFdCount == OFD_MAX){
-      // either file descriptor or open file descriptors exceeded max limit
+    if(executing->fdCount == OPEN_MAX){
+      // file descriptor exceeded max limit
       ctx->gpr[0] = -1;
     }
     else{
@@ -317,17 +317,19 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
       for(int i = 0; i < OPEN_MAX; i++){
         if(executing->fdActive[i] == false){
           fdIdx = i;
+          break;
         }
       }
-
-      ofd_t *ofd;
+      bool new = false;
+      ofd_t *ofd = NULL;
       // lookup the open file descriptor by name
       int val = ht_search(ofd_ht, (char*)ctx->gpr[0]);
       if(val != 0){
         ofd = (ofd_t*) val;
       }
-      else{
+      else if (openFdCount < OFD_MAX){
         // if not found, create a open file descriptor
+        new = true;
         for(int i = 0; i < OFD_MAX; i++){
           if(openFd[i].active == false){
             ofd = &openFd[i];
@@ -335,19 +337,26 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
           }
         }
       }
-      // updated the ofd entry
-      memset(ofd, 0, sizeof(ofd_t));
-      strcpy(ofd->name, (char*)ctx->gpr[0]);
-      ofd->active = true;
-      ofd->bytes = 0;
-      ofd->object = NULL;
-      
-      // update fd
-      executing->fdActive[fdIdx] = ofd;
-      // create entry in hashtable lookup
-      ht_insert(ofd_ht, (char*)ctx->gpr[0], (uint32_t)ofd);
-      // update return fd
-      ctx->gpr[0] = fdIdx;
+      if(ofd != NULL){
+        if(new == true){
+          // initialize an ofd
+          memset(ofd, 0, sizeof(ofd_t));
+          strcpy(ofd->name, (char*)ctx->gpr[0]);
+          ofd->active = true;
+          ofd->bytes = 0;
+          ofd->object = NULL;
+          // create entry in hashtable lookup
+          ht_insert(ofd_ht, (char*)ctx->gpr[0], (uint32_t)ofd);
+        }
+        // update fd
+        executing->fdActive[fdIdx] = true;
+        executing->fd[fdIdx] = ofd;
+        // return fd
+        ctx->gpr[0] = fdIdx;
+      }
+      else{
+        ctx->gpr[0] = -1;
+      }
     }
     break;
   }
@@ -396,8 +405,8 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   case 0x0A:
   {  // mmap (fd)
     if(executing->fdActive[ctx->gpr[0]]){
-      ofd_t *addr = executing->fd[ctx->gpr[0]];
-      ctx->gpr[0] = (uint32_t) addr;
+      ofd_t *ofd = executing->fd[ctx->gpr[0]];
+      ctx->gpr[0] = (uint32_t) ofd->object;
       //TODO: store attach info
     }
     else{
