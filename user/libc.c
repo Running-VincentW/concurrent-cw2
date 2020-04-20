@@ -210,14 +210,13 @@ void sem_destroy(sem_t *sem)
   return;
 }
 
-void sleep(int sec)
-{
-  for (uint32_t i = 0; i < (0x02000000) * sec; i++)
-  {
-    asm volatile("nop");
-  }
-  return;
-}
+void sleep(int sec){
+  asm volatile( "mov r0, %1 \n" // assign r0 = name
+                "svc %0     \n" // make system call
+              : 
+              : "I" (SYS_SLEEP), "r" (sec)
+              : "r0" );
+};
 
 int shm_open(const char *name){
   int r;

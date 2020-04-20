@@ -18,7 +18,7 @@ SECTIONS {
   .heap : {
           end   = .;
     _heap_start = .;
-    .           = . + 0x00001000;
+    .           = . + 0x000F4240;
     _heap_end   = .;
   }
   /* align       address (per AAPCS) */
@@ -41,7 +41,7 @@ SECTIONS {
   /* allocate stack for Dynamic           */
   .stack : {
     _stack_start = .;
-    .            = . + 0x0000A000;
+    .            = . + 0x001E8480;
     _stack_end   = .;
   }
 }

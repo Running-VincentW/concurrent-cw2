@@ -205,6 +205,12 @@ void hilevel_handler_rst(ctx_t *ctx)
   TIMER0->Timer1Ctrl |= 0x00000020;     // enable          timer interrupt
   TIMER0->Timer1Ctrl |= 0x00000080;     // enable          timer
 
+  TIMER0->Timer2Load = SECOND_INTERVAL; // select period = 2^20 ticks ~= 1 sec
+  TIMER0->Timer2Ctrl = 0x00000002;      // select 32-bit   timer
+  TIMER0->Timer2Ctrl |= 0x00000040;     // select periodic timer
+  TIMER0->Timer2Ctrl |= 0x00000020;     // enable          timer interrupt
+  TIMER0->Timer2Ctrl |= 0x00000080;     // enable          timer
+
   GICC0->PMR = 0x000000F0;         // unmask all            interrupts
   GICD0->ISENABLER1 |= 0x00000010; // enable timer          interrupt
   GICC0->CTLR = 0x00000001;        // enable GIC interface
@@ -439,12 +445,35 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 
     break;
   }
+  case 0x0D: // sleep(sec)
+  {
+    executing->slp_sec = ctx->gpr[0];
+    executing->status = STATUS_WAITING;
+    schedule(ctx);
+    break;
+  }
   default:
   { // 0x?? => unknown/unsupported
     break;
   }
   }
 
+  return;
+}
+
+void resume_sleep_process()
+{
+  for(int i = 0; i < procCount; i++){
+    pcb_t *c = &procTab[i];
+    if(c->status == STATUS_WAITING){
+      if(c->slp_sec <= 1){
+        c->status = STATUS_READY;
+      }
+      else{
+        c->slp_sec -= 1;
+      }
+    }
+  }
   return;
 }
 
@@ -457,9 +486,15 @@ void hilevel_handler_irq(ctx_t *ctx)
   // Step 4: handle the interrupt to perform a context switch, then reset the timer.
   if (id == GIC_SOURCE_TIMER0)
   {
-    ticker ++;
-    schedule(ctx);
-    TIMER0->Timer1IntClr = 0x01;
+    if(TIMER0->Timer1RIS == 1){
+      ticker ++;
+      schedule(ctx);
+      TIMER0->Timer1IntClr = 0x01;
+    }
+    else if(TIMER0->Timer2RIS == 1){
+      resume_sleep_process();
+      TIMER0->Timer2IntClr = 0x01;
+    }
   }
 
   // Step 5: write the interrupt identifier to signal we're done.

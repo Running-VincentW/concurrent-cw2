@@ -44,6 +44,7 @@ typedef int pid_t;
 #define SYS_MMAP      ( 0x0A )
 #define SYS_MUNMAP    ( 0x0B )
 #define SYS_SHM_UNLINK ( 0x0C )
+#define SYS_SLEEP ( 0x0D )
 
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )

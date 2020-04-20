@@ -41,8 +41,9 @@
  * - a type that captures a process PCB.
  */
 
-#define MAX_PROCS 10
-#define TIMER0_INTERVAL 0x00100000
+#define MAX_PROCS 30
+#define TIMER0_INTERVAL 0x00080000
+#define SECOND_INTERVAL 0x00200000
 #define STACK_SIZE 0x00001000
 #define OPEN_MAX 10
 #define OFD_MAX 25
@@ -94,6 +95,7 @@ typedef struct {
    ofd_t *fd[OPEN_MAX];
    bool fdActive[OPEN_MAX];
    uint8_t fdCount;
+   uint32_t slp_sec;
 } pcb_t;
 
 #endif
