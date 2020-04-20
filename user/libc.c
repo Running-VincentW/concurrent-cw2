@@ -170,20 +170,19 @@ void sem_init(sem_t *sem, unsigned value)
 
 void sem_post(sem_t *sem)
 {
-  asm volatile("ldrex     r1, [ r0 ] \n" // assign r1 = x
+  asm volatile("ldrex     r1, [ %0 ] \n" // assign r1 = x
                "add   r1, r1, #1   \n"   // r1 = r1 + 1
-               "strex r2, r1, [ r0 ] \n" // r2 <= x == r1
+               "strex r2, r1, [ %0 ] \n" // r2 <= x == r1
                "cmp   r2, #0       \n"   //    r ?= 0
                "bne   sem_post     \n"   // if r != 0, retry
                "dmb                \n"   // memory barrier
-               "bx    lr           \n"   // return
                :
                : "r"(sem)
                : "r0", "r1", "r2");
   return;
 }
 
-void sem_wait(sem_t *x)
+void sem_wait(sem_t *sem)
 {
   asm volatile("ldrex     r1, [ %0 ] \n" // assign r1 = sem
                "cmp   r1, #0         \n" //    r1 ?= 0
@@ -193,9 +192,8 @@ void sem_wait(sem_t *x)
                "cmp   r2, #0         \n" //    r ?= 0
                "bne   sem_wait       \n" // if r != 0, retry
                "dmb                  \n" // memory barrier
-               "bx    lr             \n" // return
                :
-               : "r"(x)
+               : "r"(sem)
                : "r0", "r1", "r2");
   return;
 }
