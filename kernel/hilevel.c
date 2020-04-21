@@ -241,6 +241,7 @@ void fork_(ctx_t *ctx)
   procTab[c].pid = c + 1;
   procTab[c].status = STATUS_READY;
   procTab[c].schedule = executing->schedule;
+  procTab[c].schedule.type = PROCESS_USR;
   // procTab[c].priority = executing->priority;
 
   // Create segment in stack memory, and copy relevant memory
@@ -479,7 +480,6 @@ void resume_sleep_process()
 
 void hilevel_handler_irq(ctx_t *ctx)
 {
-  PL011_putc(UART0, '!', true);
   // Step 2: read the interrupt identifier so we know the source.
   uint32_t id = GICC0->IAR;
 
@@ -487,11 +487,13 @@ void hilevel_handler_irq(ctx_t *ctx)
   if (id == GIC_SOURCE_TIMER0)
   {
     if(TIMER0->Timer1RIS == 1){
+      PL011_putc(UART0, '!', true);
       ticker ++;
       schedule(ctx);
       TIMER0->Timer1IntClr = 0x01;
     }
     else if(TIMER0->Timer2RIS == 1){
+      // PL011_putc(UART0, 'R', true);
       resume_sleep_process();
       TIMER0->Timer2IntClr = 0x01;
     }
