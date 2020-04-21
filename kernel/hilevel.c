@@ -105,7 +105,7 @@ void schedule(ctx_t *ctx)
   if (next != NULL)
   {
     dispatch(ctx, prev, next);
-    if (prev != NULL && prev->status != STATUS_TERMINATED)
+    if (prev != NULL && prev->status == STATUS_EXECUTING)
     {
       prev->status = STATUS_READY;
     }
@@ -275,11 +275,10 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 
   switch (id)
   {
-    // case 0x00 : { // 0x00 => yield()
-    //   schedule( ctx );
-
-    //   break;
-    // }
+    case 0x00 : { // 0x00 => yield()
+      schedule( ctx );
+      break;
+    }
 
   case 0x01:
   { // 0x01 => write( fd, x, n )

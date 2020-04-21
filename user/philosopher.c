@@ -54,7 +54,7 @@ void eat(philosopher_t *p)
     p->right->fork_state = USING;
     sem_post(p->right->mutex);
     // log eating
-    char msg[10];
+    char msg[15];
     composeMsg(msg, p->pid, "eats");
     write(STDOUT_FILENO, msg, 11);
     sleep(3);
@@ -126,6 +126,7 @@ void philosopher(int pid)
     {
         while (haveBothForks(p) == false)
         {
+            // write(STDOUT_FILENO, "y", 1);
             getFork(p, p->left);
             getFork(p, p->right);
         }

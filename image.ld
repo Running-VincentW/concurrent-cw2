@@ -41,7 +41,7 @@ SECTIONS {
   /* allocate stack for Dynamic           */
   .stack : {
     _stack_start = .;
-    .            = . + 0x001E8480;
+    .            = . + 0x006ACFC0;
     _stack_end   = .;
   }
 }
