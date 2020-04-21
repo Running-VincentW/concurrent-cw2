@@ -86,11 +86,13 @@ void eat(philosopher_t *p)
 
 bool haveBothForks(philosopher_t *p)
 {
+    bool r;
     sem_wait(p->left->mutex);
     sem_wait(p->right->mutex);
-    return p->left->pid == p->pid && p->right->pid == p->pid;
+    r = p->left->pid == p->pid && p->right->pid == p->pid;
     sem_post(p->left->mutex);
     sem_post(p->right->mutex);
+    return r;
 }
 
 void getFork(philosopher_t *p, fork_t *fork)
