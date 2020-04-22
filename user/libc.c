@@ -168,56 +168,34 @@ void sem_init(sem_t *sem, unsigned value)
   return;
 }
 
-void sem_post(sem_t *sem)
-{
-  asm volatile("ldrex     r1, [ r0 ] \n" // assign r1 = x
-               "add   r1, r1, #1   \n"   // r1 = r1 + 1
-               "strex r2, r1, [ r0 ] \n" // r2 <= x == r1
-               "cmp   r2, #0       \n"   //    r ?= 0
-               "bne   sem_post     \n"   // if r != 0, retry
-               "dmb                \n"   // memory barrier
-               "bx    lr           \n"   // return
-               :
-               : "r"(sem)
-               : "r0", "r1", "r2");
+extern void lolevel_sem_wait(const void* sem);
+void sem_wait(sem_t *sem){
+  lolevel_sem_wait(sem);
+  return;
+}
+extern void lolevel_sem_post(const void* sem);
+void sem_post(sem_t *sem){
+  lolevel_sem_post(sem);
   return;
 }
 
-void sem_wait(sem_t *x)
-{
-  asm volatile("ldrex     r1, [ %0 ] \n" // assign r1 = sem
-               "cmp   r1, #0         \n" //    r1 ?= 0
-               "beq   sem_wait       \n" // if r1 == 0, retry
-               "sub   r1, r1, #1     \n" // r1 = r1 - 1
-               "strex r2, r1, [ %0 ] \n" // r <= sem == r1
-               "cmp   r2, #0         \n" //    r ?= 0
-               "bne   sem_wait       \n" // if r != 0, retry
-               "dmb                  \n" // memory barrier
-               "bx    lr             \n" // return
-               :
-               : "r"(x)
-               : "r0", "r1", "r2");
-  return;
-}
+// void sem_destroy(sem_t *sem)
+// {
+//   //FIXME: I doesn't work.
+//   while (*sem != 0)
+//   {
+//     asm volatile("nop");
+//   }
+//   return;
+// }
 
-void sem_destroy(sem_t *sem)
-{
-  //FIXME: I doesn't work.
-  while (*sem != 0)
-  {
-    asm volatile("nop");
-  }
-  return;
-}
-
-void sleep(int sec)
-{
-  for (uint32_t i = 0; i < (0x02000000) * sec; i++)
-  {
-    asm volatile("nop");
-  }
-  return;
-}
+void sleep(int ms){
+  asm volatile( "mov r0, %1 \n" // assign r0 = name
+                "svc %0     \n" // make system call
+              : 
+              : "I" (SYS_SLEEP), "r" (ms)
+              : "r0" );
+};
 
 int shm_open(const char *name){
   int r;

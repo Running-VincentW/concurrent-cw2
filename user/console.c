@@ -38,6 +38,7 @@ extern void main_P3();
 extern void main_P4(); 
 extern void main_P5(); 
 extern void main_P6();
+extern void main_Ps();
 
 void* load( char* x ) {
   PL011_putc( UART1, x[ 0 ], true );
@@ -53,6 +54,9 @@ void* load( char* x ) {
   }
   else if ( 0 == strcmp( x, "P6" )){
     return &main_P6;
+  }
+  else if ( 0 == strcmp( x, "ps" )){
+    return &main_Ps;
   }
 
   return NULL;

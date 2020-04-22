@@ -105,7 +105,7 @@ void schedule(ctx_t *ctx)
   if (next != NULL)
   {
     dispatch(ctx, prev, next);
-    if (prev != NULL && prev->status != STATUS_TERMINATED)
+    if (prev != NULL && prev->status == STATUS_EXECUTING)
     {
       prev->status = STATUS_READY;
     }
@@ -205,6 +205,12 @@ void hilevel_handler_rst(ctx_t *ctx)
   TIMER0->Timer1Ctrl |= 0x00000020;     // enable          timer interrupt
   TIMER0->Timer1Ctrl |= 0x00000080;     // enable          timer
 
+  TIMER0->Timer2Load = MILLISECOND_INTERVAL; // select period = 2^20 ticks ~= 1 sec
+  TIMER0->Timer2Ctrl = 0x00000002;      // select 32-bit   timer
+  TIMER0->Timer2Ctrl |= 0x00000040;     // select periodic timer
+  TIMER0->Timer2Ctrl |= 0x00000020;     // enable          timer interrupt
+  TIMER0->Timer2Ctrl |= 0x00000080;     // enable          timer
+
   GICC0->PMR = 0x000000F0;         // unmask all            interrupts
   GICD0->ISENABLER1 |= 0x00000010; // enable timer          interrupt
   GICC0->CTLR = 0x00000001;        // enable GIC interface
@@ -235,6 +241,7 @@ void fork_(ctx_t *ctx)
   procTab[c].pid = c + 1;
   procTab[c].status = STATUS_READY;
   procTab[c].schedule = executing->schedule;
+  procTab[c].schedule.type = PROCESS_USR;
   // procTab[c].priority = executing->priority;
 
   // Create segment in stack memory, and copy relevant memory
@@ -268,11 +275,10 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 
   switch (id)
   {
-    // case 0x00 : { // 0x00 => yield()
-    //   schedule( ctx );
-
-    //   break;
-    // }
+    case 0x00 : { // 0x00 => yield()
+      schedule( ctx );
+      break;
+    }
 
   case 0x01:
   { // 0x01 => write( fd, x, n )
@@ -439,6 +445,13 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 
     break;
   }
+  case 0x0D: // sleep(sec)
+  {
+    executing->slp_sec = ctx->gpr[0];
+    executing->status = STATUS_WAITING;
+    schedule(ctx);
+    break;
+  }
   default:
   { // 0x?? => unknown/unsupported
     break;
@@ -448,18 +461,41 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   return;
 }
 
+void resume_sleep_process()
+{
+  for(int i = 0; i < procCount; i++){
+    pcb_t *c = &procTab[i];
+    if(c->status == STATUS_WAITING){
+      if(c->slp_sec <= 1){
+        c->status = STATUS_READY;
+      }
+      else{
+        c->slp_sec -= 1;
+      }
+    }
+  }
+  return;
+}
+
 void hilevel_handler_irq(ctx_t *ctx)
 {
-  PL011_putc(UART0, '!', true);
   // Step 2: read the interrupt identifier so we know the source.
   uint32_t id = GICC0->IAR;
 
   // Step 4: handle the interrupt to perform a context switch, then reset the timer.
   if (id == GIC_SOURCE_TIMER0)
   {
-    ticker ++;
-    schedule(ctx);
-    TIMER0->Timer1IntClr = 0x01;
+    if(TIMER0->Timer1RIS == 1){
+      PL011_putc(UART0, '!', true);
+      ticker ++;
+      schedule(ctx);
+      TIMER0->Timer1IntClr = 0x01;
+    }
+    else if(TIMER0->Timer2RIS == 1){
+      // PL011_putc(UART0, 'R', true);
+      resume_sleep_process();
+      TIMER0->Timer2IntClr = 0x01;
+    }
   }
 
   // Step 5: write the interrupt identifier to signal we're done.
