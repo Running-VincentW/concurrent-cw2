@@ -57,7 +57,7 @@ void eat(philosopher_t *p)
     char msg[15];
     composeMsg(msg, p->pid, "eats");
     write(STDOUT_FILENO, msg, 11);
-    sleep(3);
+    sleep(2000);
     // finish eating, mark fork as dirty
     p->eat_count++;
     sem_wait(p->left->mutex);
@@ -81,6 +81,7 @@ void eat(philosopher_t *p)
     // logs finish eating
     composeMsg(msg, p->pid, "thinks");
     write(STDOUT_FILENO, msg, 13);
+    yield();
     return;
 }
 

@@ -189,11 +189,11 @@ void sem_post(sem_t *sem){
 //   return;
 // }
 
-void sleep(int sec){
+void sleep(int ms){
   asm volatile( "mov r0, %1 \n" // assign r0 = name
                 "svc %0     \n" // make system call
               : 
-              : "I" (SYS_SLEEP), "r" (sec)
+              : "I" (SYS_SLEEP), "r" (ms)
               : "r0" );
 };
 

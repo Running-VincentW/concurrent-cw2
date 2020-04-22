@@ -205,7 +205,7 @@ void hilevel_handler_rst(ctx_t *ctx)
   TIMER0->Timer1Ctrl |= 0x00000020;     // enable          timer interrupt
   TIMER0->Timer1Ctrl |= 0x00000080;     // enable          timer
 
-  TIMER0->Timer2Load = SECOND_INTERVAL; // select period = 2^20 ticks ~= 1 sec
+  TIMER0->Timer2Load = MILLISECOND_INTERVAL; // select period = 2^20 ticks ~= 1 sec
   TIMER0->Timer2Ctrl = 0x00000002;      // select 32-bit   timer
   TIMER0->Timer2Ctrl |= 0x00000040;     // select periodic timer
   TIMER0->Timer2Ctrl |= 0x00000020;     // enable          timer interrupt

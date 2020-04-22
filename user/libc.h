@@ -94,8 +94,8 @@ extern void sem_post(sem_t *sem);
 // destroy a semaphore
 extern void sem_destroy(sem_t *sem);
 
-// sleep for debugging
-extern void sleep(int sec);
+// put the process to sleep for ms milliseconds
+extern void sleep(int ms);
 
 // for shared memory
 typedef uint32_t off_t;
