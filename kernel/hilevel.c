@@ -311,7 +311,8 @@ void fork_(ctx_t *ctx)
   ctx->gpr[0] = e->pid;
 }
 
-ofd_t *createOfd(const char *name){
+ofd_t *createOfd(const char *name)
+{
   uint32_t c = openFdCount++;
   memset(&openFd[c], 0, sizeof(ofd_t));
   openFd[c].active = true;
@@ -331,10 +332,11 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 
   switch (id)
   {
-    case 0x00 : { // 0x00 => yield()
-      schedule( ctx );
-      break;
-    }
+  case 0x00:
+  { // 0x00 => yield()
+    schedule(ctx);
+    break;
+  }
 
   case 0x01:
   { // 0x01 => write( fd, x, n )
@@ -369,8 +371,8 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   }
   case 0x08:
   { // shmopen(name)
+    // check if # of file descriptor exceeded max limit
     if(executing->fdCount == OPEN_MAX){
-      // file descriptor exceeded max limit
       ctx->gpr[0] = -1;
     }
     else{
@@ -387,10 +389,11 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
       // lookup the open file descriptor by name
       int val = ht_search(ofd_ht, (char*)ctx->gpr[0]);
       if(val != 0){
+        // do nothing yet if the ofd already exist
         ofd = (ofd_t*) val;
       }
       else if (openFdCount < OFD_MAX){
-        // if not found, create a open file descriptor
+        // if the ofd doesn't exist, find a entry to create an ofd and set new = true
         new = true;
         for(int i = 0; i < OFD_MAX; i++){
           if(openFd[i].active == false){
@@ -417,6 +420,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
         ctx->gpr[0] = fdIdx;
       }
       else{
+        // unable to create ofd due to insufficient ofd entries within the data structure
         ctx->gpr[0] = -1;
       }
     }
