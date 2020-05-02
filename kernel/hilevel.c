@@ -235,6 +235,8 @@ void hilevel_handler_rst(ctx_t *ctx)
   sp = (uint32_t)&_stack_end;
   return;
 }
+
+/* Implements the exec interface*/
 void exec_(ctx_t *ctx)
 {
   ctx->sp = executing->tos;
@@ -243,10 +245,12 @@ void exec_(ctx_t *ctx)
   executing->fdCount = 0;
   memset(&executing->fdActive, 0, sizeof(executing->fdActive));
 }
+
+/* Implements the fork interface
+ * creates a new PCB entry which preserve the ctx and stack memory but with a unique PID
+ */
 void fork_(ctx_t *ctx)
 {
-  // Create a PCB entry with same ctx but unique pid
-  // TODO: do something to claim sys resources back
   pcb_t *e = NULL;
   uint32_t eIdx = 0;
   for (int i = 0; i < procCount; i++)
