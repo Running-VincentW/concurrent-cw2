@@ -247,54 +247,70 @@ void fork_(ctx_t *ctx)
 {
   // Create a PCB entry with same ctx but unique pid
   // TODO: do something to claim sys resources back
-  uint32_t c = procCount++;
-  memset(&procTab[c], 0, sizeof(pcb_t));
-  procTab[c].ctx = *ctx;
-  procTab[c].ctx.gpr[0] = 0;
-  procTab[c].pid = c + 1;
-  procTab[c].status = STATUS_READY;
-  procTab[c].schedule = executing->schedule;
-  procTab[c].schedule.type = PROCESS_USR;
-  // procTab[c].priority = executing->priority;
+  pcb_t *e = NULL;
+  uint32_t eIdx = 0;
+  for (int i = 0; i < procCount; i++)
+  {
+    if (procTab[i].status == STATUS_TERMINATED)
+    {
+      e = &procTab[i];
+      eIdx = i;
+      break;
+    }
+  }
+  if (e == NULL)
+  {
+    eIdx = procCount++;
+    e = &procTab[eIdx];
+  }
+  // copy ctx from parent to child process
+  memset(e, 0, sizeof(pcb_t));
+  e->ctx = *ctx;
+  e->ctx.gpr[0] = 0;
+  e->pid = eIdx + 1;
+  e->status = STATUS_READY;
+  e->schedule = executing->schedule;
+  e->schedule.type = PROCESS_USR;
 
-  // Create segment in stack memory, and copy relevant memory
-  // e.g. we have 0x72500000
-  procTab[c].tos = sp;
+  // create new stack in stack segment, and copy content in memory over
+  e->tos = sp;
   sp -= STACK_SIZE;
   mmu_unable();
-  memcpy((uint32_t *)(procTab[c].tos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
-  if(NULL != executing->T_pt){
+  memcpy((uint32_t *)(e->tos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
+  if (NULL != executing->T_pt)
+  {
     mmu_enable();
   }
-  
+
   // Memory virtualisation
   // set the virtual address space to an identity map
-  procTab[c].T_pt = procTab[c].T;
-  for( int i = 0; i < 4096; i++ ) {
-    procTab[c].T[ i ] = ( ( pte_t )( i ) << 20 ) | 0x00C02;
+  e->T_pt = e->T;
+  for (int i = 0; i < 4096; i++)
+  {
+    e->T[i] = ((pte_t)(i) << 20) | 0x00C02;
   }
   int from = (int)&_stack_start / 0x100000;
   int to = (int)&_stack_end / 0x100000;
-  int current = ((int)procTab[c].tos - 0x100000) / 0x100000;
+  int current = ((int)e->tos - 0x100000) / 0x100000;
   // set protection for stack space
-  for(int i = from; i < to; i++){
+  for (int i = from; i < to; i++)
+  {
     // grant no access to other stack segments
-    procTab[c].T[ i ] &= ~0x001E0; // mask domain
-    procTab[c].T[ i ] |=  0x00020; // set  domain = 0001_{(2)} => client
-    procTab[c].T[ i ] &= ~0x08C00; // mask access
-    procTab[c].T[ i ] |=  0x00000; // set  access =  000_{(2)} => no access
+    e->T[i] &= ~0x001E0; // mask domain
+    e->T[i] |= 0x00020;  // set  domain = 0001_{(2)} => client
+    e->T[i] &= ~0x08C00; // mask access
+    e->T[i] |= 0x00000;  // set  access =  000_{(2)} => no access
   }
   // grant access to current stack segment
-  procTab[c].T[ current ] &= ~0x08C00; // mask access
-  procTab[c].T[ current ] |=  0x00C00; // set access = 011_{(2)} => full access
+  e->T[current] &= ~0x08C00; // mask access
+  e->T[current] |= 0x00C00;  // set access = 011_{(2)} => full access
 
-  procTab[c].ctx.sp = procTab[c].tos - executing->tos + ctx->sp;
-  // uint32_t sBytes   = ctx->sp - executing->ctx.sp;
-  // procTab[c].ctx.sp = procTab[c].tos + sBytes;
-  // memcpy((uint32_t*)procTab[c].tos, (uint32_t*)executing->ctx.sp, sBytes);
+  e->ctx.sp = e->tos - executing->tos + ctx->sp;
 
-  ctx->gpr[0] = procTab[c].pid;
+  // return child process PID to parent process
+  ctx->gpr[0] = e->pid;
 }
+
 ofd_t *createOfd(const char *name){
   uint32_t c = openFdCount++;
   memset(&openFd[c], 0, sizeof(ofd_t));
@@ -450,6 +466,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   }
   case 0x0A:
   {  // mmap (fd)
+  // FIXME: I need to be a proper memory mapping
     if(executing->fdActive[ctx->gpr[0]]){
       ofd_t *ofd = executing->fd[ctx->gpr[0]];
       ctx->gpr[0] = (uint32_t) ofd->object;
