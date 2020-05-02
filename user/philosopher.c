@@ -57,7 +57,7 @@ void eat(philosopher_t *p)
     char msg[15];
     composeMsg(msg, p->pid, "eats");
     write(STDOUT_FILENO, msg, 11);
-    sleep(2000);
+    sleep(3000);
     // finish eating, mark fork as dirty
     p->eat_count++;
     sem_wait(p->left->mutex);

@@ -46,6 +46,10 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
       mmu_flush();
       mmu_enable();
     }
+    else{
+      mmu_unable();
+      mmu_flush();
+    }
   }
 
   PL011_putc(UART0, '[', true);
@@ -257,7 +261,11 @@ void fork_(ctx_t *ctx)
   // e.g. we have 0x72500000
   procTab[c].tos = sp;
   sp -= STACK_SIZE;
+  mmu_unable();
   memcpy((uint32_t *)(procTab[c].tos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
+  if(NULL != executing->T_pt){
+    mmu_enable();
+  }
   
   // Memory virtualisation
   // set the virtual address space to an identity map
