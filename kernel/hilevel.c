@@ -550,5 +550,7 @@ void hilevel_handler_pab() {
 }
 
 void hilevel_handler_dab() {
+  // should abort user process
+  executing->status = STATUS_INVALID;
   return;
 }
