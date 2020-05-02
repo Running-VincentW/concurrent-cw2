@@ -8,9 +8,6 @@
 #include "P1.h"
 
 void main_P1() {
-  // while( 1 ) {
-  //   write( STDOUT_FILENO, "+", 1 );
-  // }
   pid_t pid = fork();
 
   if (pid > 0){
