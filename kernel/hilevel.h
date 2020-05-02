@@ -22,6 +22,7 @@
 #include   "GIC.h"
 #include "PL011.h"
 #include "SP804.h"
+#include   "MMU.h"
 
 // Include functionality relating to the   kernel.
 
@@ -42,9 +43,9 @@
  */
 
 #define MAX_PROCS 30
-#define TIMER0_INTERVAL 0x000E225F
+#define TIMER0_INTERVAL 0x000E2130
 #define MILLISECOND_INTERVAL 0x0000039E
-#define STACK_SIZE 0x00001000
+#define STACK_SIZE 0x00100000
 #define OPEN_MAX 10
 #define OFD_MAX 25
 
@@ -86,6 +87,12 @@ typedef struct{
   // file offset, file status, file access modes
 } ofd_t;
 
+/* T is a page table, which, for the 1MB pages (or sections) we use,
+ * has 4096 entries: note the need to align T to a multiple of 16kB.
+ */
+
+typedef uint32_t pte_t;
+
 typedef struct {
      pid_t      pid; // Process IDentifier (PID)
   status_t   status; // current status
@@ -96,6 +103,8 @@ typedef struct {
    bool fdActive[OPEN_MAX];
    uint8_t fdCount;
    uint32_t slp_sec;
+   pte_t T[ 4096 ] __attribute__ ((aligned (1 << 14)));
+   pte_t *T_pt;
 } pcb_t;
 
 #endif

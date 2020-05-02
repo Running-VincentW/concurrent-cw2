@@ -15,10 +15,10 @@ SECTIONS {
   /* place bss  segment(s)           */        
   .bss  : {                         *(.bss         ) }
   /* allocate heap memory for malloc*/
-  .heap : {
+  .heap : ALIGN( 0x100000 ){
           end   = .;
     _heap_start = .;
-    .           = . + 0x000F4240;
+    .           = . + 0x00100000;
     _heap_end   = .;
   }
   /* align       address (per AAPCS) */
@@ -29,19 +29,24 @@ SECTIONS {
   /* allocate stack for svc mode     */
   .       = . + 0x00001000;  
   tos_svc = .;
-  /* allocate stack for P1           */
+  /* allocate stack for abt mode     */
   .       = . + 0x00001000;  
+  tos_abt = .;
+  /* align       address (to page boundary) */
+  .       = ALIGN( 0x100000 );        
+  /* allocate stack for P1           */
+  .       = . + 0x00100000;  
   tos_P1  = .;
   /* allocate stack for P2           */
-  .       = . + 0x00001000;  
+  .       = . + 0x00100000;  
   tos_P2  = .;
   /* allocate stack for Console           */
-  .       = . + 0x00001000;  
+  .       = . + 0x00100000;  
   tos_console  = .;
   /* allocate stack for Dynamic           */
   .stack : {
     _stack_start = .;
-    .            = . + 0x006ACFC0;
+    .            = . + 0x01E00000;
     _stack_end   = .;
   }
 }
