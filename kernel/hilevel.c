@@ -41,6 +41,11 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
   {
     memcpy(ctx, &next->ctx, sizeof(ctx_t)); // restore  execution context of P_{next}
     next_pid = '0' + next->pid;
+    if( NULL != next->T_pt){
+      mmu_set_ptr0( next->T );
+      mmu_flush();
+      mmu_enable();
+    }
   }
 
   PL011_putc(UART0, '[', true);
@@ -125,6 +130,7 @@ extern void main_console();
 extern uint32_t tos_console;
 extern uint32_t _stack_start;
 extern uint32_t _stack_end;
+extern uint32_t tos_svc;
 
 void hilevel_handler_rst(ctx_t *ctx)
 {
@@ -217,6 +223,9 @@ void hilevel_handler_rst(ctx_t *ctx)
   GICD0->CTLR = 0x00000001;        // enable GIC distributor
 
   int_enable_irq();
+  mmu_set_dom( 0, 0x3 ); // set domain 0 to 11_{(2)} => manager (i.e., not checked)
+  mmu_set_dom( 1, 0x1 ); // set domain 1 to 01_{(2)} => client  (i.e.,     checked)
+
   PL011_putc(UART0, 'K', true);
   
   sp = (uint32_t)&_stack_end;
@@ -245,9 +254,32 @@ void fork_(ctx_t *ctx)
   // procTab[c].priority = executing->priority;
 
   // Create segment in stack memory, and copy relevant memory
+  // e.g. we have 0x72500000
   procTab[c].tos = sp;
   sp -= STACK_SIZE;
   memcpy((uint32_t *)(procTab[c].tos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
+  
+  // Memory virtualisation
+  // set the virtual address space to an identity map
+  procTab[c].T_pt = procTab[c].T;
+  for( int i = 0; i < 4096; i++ ) {
+    procTab[c].T[ i ] = ( ( pte_t )( i ) << 20 ) | 0x00C02;
+  }
+  int from = (int)&_stack_start / 0x100000;
+  int to = (int)&_stack_end / 0x100000;
+  int current = ((int)procTab[c].tos - 0x100000) / 0x100000;
+  // set protection for stack space
+  for(int i = from; i < to; i++){
+    // grant no access to other stack segments
+    procTab[c].T[ i ] &= ~0x001E0; // mask domain
+    procTab[c].T[ i ] |=  0x00020; // set  domain = 0001_{(2)} => client
+    procTab[c].T[ i ] &= ~0x08C00; // mask access
+    procTab[c].T[ i ] |=  0x00000; // set  access =  000_{(2)} => no access
+  }
+  // grant access to current stack segment
+  procTab[c].T[ current ] &= ~0x08C00; // mask access
+  procTab[c].T[ current ] |=  0x00C00; // set access = 011_{(2)} => full access
+
   procTab[c].ctx.sp = procTab[c].tos - executing->tos + ctx->sp;
   // uint32_t sBytes   = ctx->sp - executing->ctx.sp;
   // procTab[c].ctx.sp = procTab[c].tos + sBytes;
@@ -502,5 +534,13 @@ void hilevel_handler_irq(ctx_t *ctx)
 
   GICC0->EOIR = id;
 
+  return;
+}
+
+void hilevel_handler_pab() {
+  return;
+}
+
+void hilevel_handler_dab() {
   return;
 }
