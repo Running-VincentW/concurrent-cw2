@@ -7,15 +7,28 @@
 
 #include "P1.h"
 
-void main_P1() {
+void main_P1()
+{
+  int a = 1;
   pid_t pid = fork();
 
-  if (pid > 0){
+  if (pid > 0)
+  {
     write(STDOUT_FILENO, "parent", 6);
   }
-  else if (pid == 0){
+  else if (pid == 0)
+  {
     write(STDOUT_FILENO, "child", 5);
+    if (a == 1)
+    {
+      write(STDOUT_FILENO, "[ok]\n", 6);
+    }
+    else
+    {
+      write(STDOUT_FILENO, "[failed]\n", 10);
+    }
   }
+  a = 0;
 
-  exit( EXIT_SUCCESS );
+  exit(EXIT_SUCCESS);
 }

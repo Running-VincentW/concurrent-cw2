@@ -11,10 +11,26 @@ void testStackProtection(){
     return;
 }
 
+void testVirtualMem(){
+  for (int i = 0 ; i < 5 ; i++){
+    int s = fork();
+    if(s == 0){
+      char x = '0' + i;
+      write(STDOUT_FILENO, &x, 1);
+      exit(EXIT_SUCCESS);
+    }
+  }
+}
+
 void main_Tests() {
   int s = fork();
   if (s==0){
       testStackProtection();
+      exit( EXIT_SUCCESS );
+  }
+  s = fork();
+  if (s==0){
+      testVirtualMem();
       exit( EXIT_SUCCESS );
   }
   
