@@ -45,6 +45,7 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
     next_pid = '0' + next->pid;
     // context switch the page table for the MMU
     if( NULL != next->T_pt){
+      // PL011_putc(UART0, '*', true);
       mmu_set_ptr0( next->T );
       mmu_flush();
       mmu_enable();
@@ -263,10 +264,12 @@ void fork_(ctx_t *ctx)
   e->schedule.type = PROCESS_USR;
 
   // create new stack in stack segment, and copy content in memory over
-  e->tos = sp;
+  // e->tos = sp;
+  uint32_t pTos = sp;
   sp -= STACK_SIZE;
+
   mmu_unable();
-  memcpy((uint32_t *)(e->tos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
+  memcpy((uint32_t *)(pTos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
   if (NULL != executing->T_pt)
   {
     mmu_enable();
@@ -281,7 +284,7 @@ void fork_(ctx_t *ctx)
   }
   int from = (int)&_stack_start / 0x100000;
   int to = (int)&_stack_end / 0x100000;
-  int current = ((int)e->tos - 0x100000) / 0x100000;
+  int pAddr = ((int)pTos - 0x100000) / 0x100000;
   // set protection for stack space
   for (int i = from; i < to; i++)
   {
@@ -291,10 +294,14 @@ void fork_(ctx_t *ctx)
     e->T[i] &= ~0x08C00; // mask access
     e->T[i] |= 0x00000;  // set  access =  000_{(2)} => no access
   }
+  // map virtual segment to current segment
+  int vAddr = to - 0x1;
+  e->T[vAddr] = e->T[pAddr];
   // grant access to current stack segment
-  e->T[current] &= ~0x08C00; // mask access
-  e->T[current] |= 0x00C00;  // set access = 011_{(2)} => full access
+  e->T[vAddr] &= ~0x08C00; // mask access
+  e->T[vAddr] |= 0x00C00;  // set access = 011_{(2)} => full access
 
+  e->tos = (uint32_t)&_stack_end;
   e->ctx.sp = e->tos - executing->tos + ctx->sp;
 
   // return child process PID to parent process
