@@ -43,7 +43,7 @@
  */
 
 #define MAX_PROCS 30
-#define TIMER0_INTERVAL 0x000E2130
+#define TIMER0_INTERVAL 0x00043D28
 #define MILLISECOND_INTERVAL 0x0000039E
 #define STACK_SIZE 0x00100000
 #define OPEN_MAX 10
@@ -94,17 +94,18 @@ typedef struct{
 typedef uint32_t pte_t;
 
 typedef struct {
-     pid_t      pid; // Process IDentifier (PID)
-  status_t   status; // current status
-  uint32_t      tos; // address of Top of Stack (ToS)
-     ctx_t      ctx; // execution context
-   scheduler_t schedule; // scheduler info
-   ofd_t *fd[OPEN_MAX];
-   bool fdActive[OPEN_MAX];
-   uint8_t fdCount;
-   uint32_t slp_sec;
-   pte_t T[ 4096 ] __attribute__ ((aligned (1 << 14)));
-   pte_t *T_pt;
+        pid_t                pid; // Process IDentifier (PID)
+     status_t             status; // current status
+     uint32_t                tos; // address of Top of Stack (ToS)
+        ctx_t                ctx; // execution context
+  scheduler_t           schedule; // scheduler info
+        ofd_t      *fd[OPEN_MAX];
+         bool fdActive[OPEN_MAX];
+      uint8_t            fdCount;
+     uint32_t            slp_sec;
+        pte_t T[ 4096 ] __attribute__ ((aligned (1 << 14)));
+        pte_t              *T_pt;
+        pid_t             parent;
 } pcb_t;
 
 #endif
