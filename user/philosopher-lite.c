@@ -38,15 +38,15 @@ void philosopher(philosopher_t *p)
         sem_wait(p->first);
         sem_wait(p->second);
         // eat
-        composeMsg(msg, p->pid, "eats");
-        write(STDOUT_FILENO, msg, 11);
+        composeMsg(msg, p->pid, "eats\n");
+        write(STDOUT_FILENO, msg, 12);
         p->eat_count++;
         sleep(3000);
         sem_post(p->first);
         sem_post(p->second);
         // think
-        composeMsg(msg, p->pid, "thinks");
-        write(STDOUT_FILENO, msg, 13);
+        composeMsg(msg, p->pid, "thinks\n");
+        write(STDOUT_FILENO, msg, 14);
         sleep(1000);
     }
     return;
@@ -99,7 +99,7 @@ void main_Ps()
     }
 
     // Performance count
-    sleep(10000);
+    sleep(60000);
     int min = philosophers[0].eat_count;
     int max = philosophers[0].eat_count;
     int total = 0;
