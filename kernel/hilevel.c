@@ -56,10 +56,22 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
   }
 
   PL011_putc(UART0, '[', true);
-  PL011_putc(UART0, prev_pid, true);
+  if(prev->pid < 10){
+    PL011_putc(UART0, prev_pid, true);
+  }
+  else{
+    PL011_putc(UART0, ((prev->pid % 100) / 10) + '0' , true);
+    PL011_putc(UART0, ((prev->pid %  10) /  1) + '0' , true);
+  }
   PL011_putc(UART0, '-', true);
   PL011_putc(UART0, '>', true);
-  PL011_putc(UART0, next_pid, true);
+  if(next->pid < 10){
+    PL011_putc(UART0, next_pid, true);
+  }
+  else{
+    PL011_putc(UART0, ((next->pid % 100) / 10) + '0' , true);
+    PL011_putc(UART0, ((next->pid %  10) /  1) + '0' , true);
+  }
   PL011_putc(UART0, ']', true);
 
   executing = next; // update   executing process to P_{next}

@@ -57,7 +57,7 @@ philosopher_t philosophers[20];
 
 void main_Ps()
 {
-    int n = 4;
+    int n = 16;
     // assign a mutex to each resource (fork)
     for (int i = 0; i < n; i++)
     {
