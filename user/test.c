@@ -20,6 +20,7 @@ void testVirtualMem(){
       exit(EXIT_SUCCESS);
     }
   }
+  sleep(3000);
 }
 
 void main_Tests() {
@@ -33,6 +34,6 @@ void main_Tests() {
       testVirtualMem();
       exit( EXIT_SUCCESS );
   }
-  
+  sleep(3000);
   exit( EXIT_SUCCESS );
 }

@@ -9,7 +9,8 @@
 
 void main_P1()
 {
-  int a = 1;
+  int a = 0;
+  a++;
   pid_t pid = fork();
 
   if (pid > 0)
@@ -29,6 +30,7 @@ void main_P1()
     }
   }
   a = 0;
+  sleep(3000);
 
   exit(EXIT_SUCCESS);
 }
