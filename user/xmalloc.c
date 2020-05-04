@@ -22,15 +22,16 @@
  * 
  */
 
-#include <stdio.h>	
+// #include <stdio.h>	
 #include <sys/types.h>
 #include <string.h>		
-#include <stdlib.h>
+#include <malloc.h>
+// #include <stdlib.h>
 
 static void *xmalloc_fatal(size_t size) {
   if (size==0) return NULL;
-  fprintf(stderr, "Out of memory.");
-  exit(1);
+  // fprintf(stderr, "Out of memory.");
+  // exit(1);
 }
 
 void *xmalloc (size_t size) {
