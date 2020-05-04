@@ -276,32 +276,36 @@ void fork_(ctx_t *ctx)
   e->schedule.type = PROCESS_USR;
   e->parent = executing->pid;
 
-  // create new stack in stack segment, and copy content in memory over
-  // e->tos = sp;
+
+  // Create a new stack segment
   uint32_t pTos = sp;
   sp -= STACK_SIZE;
+  int pAddr = ((int)pTos - STACK_SIZE) / STACK_SIZE;
 
-  mmu_unable();
+  // copy stack memory from parent to child process
+  executing->T[pAddr] &= ~0x08C00; // mask domain
+  executing->T[pAddr] |= 0x00C00;  // set  domain = 0011_{(2)} => manager
+  mmu_flush();
   memcpy((uint32_t *)(pTos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
-  if (NULL != executing->T_pt)
-  {
-    mmu_enable();
-  }
+  executing->T[pAddr] &= ~0x08C00; // mask domain
+  executing->T[pAddr] |= 0x00000;  // set  domain = 0001_{(2)} => client
+  mmu_flush();
+  
 
-  // Memory virtualisation
-  // set the virtual address space to an identity map
+  // set up the page table for the new process
+  // mark there exist a page table for this process
   e->T_pt = e->T;
+  // creates a identity mapping
   for (int i = 0; i < 4096; i++)
   {
     e->T[i] = ((pte_t)(i) << 20) | 0x00C02;
   }
-  int from = (int)&_stack_start / 0x100000;
-  int to = (int)&_stack_end / 0x100000;
-  int pAddr = ((int)pTos - 0x100000) / 0x100000;
+
   // set protection for stack space
+  int from = (int)&_stack_start / STACK_SIZE;
+  int to = (int)&_stack_end / STACK_SIZE;
   for (int i = from; i < to; i++)
   {
-    // grant no access to other stack segments
     e->T[i] &= ~0x001E0; // mask domain
     e->T[i] |= 0x00020;  // set  domain = 0001_{(2)} => client
     e->T[i] &= ~0x08C00; // mask access
@@ -633,6 +637,7 @@ void hilevel_handler_pab() {
 
 void hilevel_handler_dab() {
   // should abort user process
+  PL011_putc(UART0, '?', true);
   executing->status = STATUS_INVALID;
   return;
 }
