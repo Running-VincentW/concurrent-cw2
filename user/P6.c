@@ -1,5 +1,4 @@
 // C program to demonstrate working of Semaphores 
-// #include <stdio.h> 
 // #include <pthread.h> 
 // #include <semaphore.h> 
 #include "libc.h"

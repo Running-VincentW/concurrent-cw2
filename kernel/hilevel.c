@@ -273,6 +273,7 @@ void fork_(ctx_t *ctx)
   e->status = STATUS_READY;
   e->schedule = executing->schedule;
   e->schedule.type = PROCESS_USR;
+  e->parent = executing->pid;
 
   // create new stack in stack segment, and copy content in memory over
   e->tos = sp;
@@ -442,6 +443,20 @@ ofd_t *createOfd(const char *name)
   return &openFd[c];
 }
 
+void terminateChild(pcb_t *p)
+{
+  // terminate child
+  for (int i = 0; i < procCount; i++)
+  {
+    if (procTab[i].parent == p->pid)
+    {
+      terminateChild(&procTab[i]);
+    }
+  }
+  // terminate self
+  p->status = STATUS_TERMINATED;
+}
+
 void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 {
   switch (id)
@@ -474,12 +489,27 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   case 0x04:
   { // 0x04 => exit
     executing->status = STATUS_TERMINATED;
+    terminateChild(executing);
     schedule(ctx);
     break;
   }
   case 0x05:
   { // 0x05 => exec( add )
     exec_(ctx);
+    break;
+  }
+  case 0x06:
+  { // 0x06 => kill
+    pid_t pid = (pid_t)ctx->gpr[0];
+    for (int i = 0; i < procCount; i++)
+    {
+      if (procTab[i].pid == pid)
+      {
+        terminateChild(&procTab[i]);
+      }
+    }
+    schedule(ctx);
+    ctx->gpr[0] = 1;
     break;
   }
   case 0x08:
