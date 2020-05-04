@@ -635,9 +635,10 @@ void hilevel_handler_pab() {
   return;
 }
 
-void hilevel_handler_dab() {
+void hilevel_handler_dab(ctx_t *ctx) {
   // should abort user process
   PL011_putc(UART0, '?', true);
   executing->status = STATUS_INVALID;
+  schedule(ctx);
   return;
 }
