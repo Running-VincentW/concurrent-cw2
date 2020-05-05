@@ -27,6 +27,7 @@ processType_t schedulerProcessType;
 
 // stack segment related, sp points to tos of next stack frame
 uint32_t sp;
+bool stack_used[MAX_PROCS];
 extern uint32_t _stack_start;
 extern uint32_t _stack_end;
 
@@ -199,7 +200,10 @@ void hilevel_handler_rst(ctx_t *ctx)
   ofd_ht = ht_new();
 
   // update pointer for stack segment
-  sp = (uint32_t)&_stack_end;
+  for(int i = 0; i < MAX_PROCS; i++){
+    stack_used[i] = false;
+  }
+  // sp = (uint32_t)&_stack_end;
 
 
   TIMER0->Timer1Load = TIMER0_INTERVAL; // select period = 2^20 ticks ~= 1 sec
@@ -269,8 +273,17 @@ void fork_(ctx_t *ctx)
 
 
   // Create a new stack segment
-  uint32_t pTos = sp;
-  sp -= STACK_SIZE;
+  uint32_t pTos = 0;
+  for(int i = 0; i < MAX_PROCS; i++){
+    if(stack_used[i] == false){
+      stack_used[i] = true;
+      e->stack_pos = i;
+      pTos = (uint32_t)&_stack_end - STACK_SIZE * i;
+      break;
+    }
+  }
+  // uint32_t pTos = sp;
+  // sp -= STACK_SIZE;
   int pAddr = ((int)pTos - STACK_SIZE) / STACK_SIZE;
 
   // copy stack memory from parent to child process
@@ -463,6 +476,7 @@ void terminateChild(pcb_t *p)
     }
   }
   // terminate self
+  stack_used[p->stack_pos] = false;
   p->status = STATUS_TERMINATED;
 }
 

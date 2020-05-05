@@ -21,8 +21,10 @@ SECTIONS {
     .           = . + 0x00100000;
     _heap_end   = .;
   }
+  
   /* align       address (per AAPCS) */
   .       = ALIGN( 8 );        
+
   /* allocate stack for irq mode     */
   .       = . + 0x00001000;  
   tos_irq = .;
@@ -32,14 +34,10 @@ SECTIONS {
   /* allocate stack for abt mode     */
   .       = . + 0x00001000;  
   tos_abt = .;
+
   /* align       address (to page boundary) */
-  .       = ALIGN( 0x100000 );        
-  /* allocate stack for P1           */
-  .       = . + 0x00100000;  
-  tos_P1  = .;
-  /* allocate stack for P2           */
-  .       = . + 0x00100000;  
-  tos_P2  = .;
+  .       = ALIGN( 0x100000 );    
+
   /* allocate stack for Console           */
   .       = . + 0x00100000;  
   tos_console  = .;

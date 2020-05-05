@@ -97,6 +97,7 @@ typedef struct {
         pid_t                pid; // Process IDentifier (PID)
      status_t             status; // current status
      uint32_t                tos; // address of Top of Stack (ToS)
+     uint32_t          stack_pos;
         ctx_t                ctx; // execution context
   scheduler_t           schedule; // scheduler info
         ofd_t      *fd[OPEN_MAX];
