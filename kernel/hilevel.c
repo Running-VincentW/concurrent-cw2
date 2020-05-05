@@ -201,7 +201,7 @@ void hilevel_handler_rst(ctx_t *ctx)
   // sp = (uint32_t)&_stack_end;
 
 
-  TIMER0->Timer1Load = TIMER0_INTERVAL; // select period = 2^20 ticks ~= 1 sec
+  TIMER0->Timer1Load = SCHEDULER_INTERVAL; // select period = 2^20 ticks ~= 1 sec
   TIMER0->Timer1Ctrl = 0x00000002;      // select 32-bit   timer
   TIMER0->Timer1Ctrl |= 0x00000040;     // select periodic timer
   TIMER0->Timer1Ctrl |= 0x00000020;     // enable          timer interrupt
