@@ -15,7 +15,6 @@
 #include <stdint.h>
 
 #include <string.h>
-// #include <time.h>
 
 // Include functionality relating to the platform.
 
@@ -77,20 +76,6 @@ typedef struct {
   uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
 } ctx_t;
 
-// open file descriptors
-// the ofd only support type shared memory object
-typedef struct{
-  bool active;
-  char name[10];
-  uint32_t *object;
-  uint32_t bytes;
-  // file offset, file status, file access modes
-} ofd_t;
-
-/* T is a page table, which, for the 1MB pages (or sections) we use,
- * has 4096 entries: note the need to align T to a multiple of 16kB.
- */
-
 typedef uint32_t pte_t;
 
 typedef struct {
@@ -100,13 +85,10 @@ typedef struct {
      uint32_t          stack_pos;
         ctx_t                ctx; // execution context
   scheduler_t           schedule; // scheduler info
-        ofd_t      *fd[OPEN_MAX];
-         bool fdActive[OPEN_MAX];
-      uint8_t            fdCount;
-     uint32_t            slp_sec;
-        pte_t T[ 4096 ] __attribute__ ((aligned (1 << 14)));
-        pte_t              *T_pt;
-        pid_t             parent;
+     uint32_t            slp_sec; // sleep duration upon sleep sys call
+        pte_t T[ 4096 ] __attribute__ ((aligned (1 << 14))); // page table
+        pte_t              *T_pt; // indicates if a page table exist
+        pid_t             parent; // pid of parent
 } pcb_t;
 
 #endif

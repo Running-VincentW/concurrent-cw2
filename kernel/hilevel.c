@@ -7,24 +7,16 @@
 
 #include "hilevel.h"
 
+// process
 pcb_t procTab[MAX_PROCS];
 pcb_t *executing = NULL;
 uint32_t procCount = 0;
-
-/* data structures for ofd
- * openFd : list of ofd stored in the kernel
- * openFdCount : number of ofd
- * ofd_ht : hashtable that maps (char*) name to (int) &ofd
- */
-ofd_t openFd[OFD_MAX];
-uint32_t openFdCount = 0;
 
 // scheduler related, ticker simulates a RTC, incremented every millisecond
 uint32_t ticker = 0;
 processType_t schedulerProcessType;
 
 // stack segment related, sp points to tos of next stack frame
-uint32_t sp;
 bool stack_used[MAX_PROCS];
 extern uint32_t _stack_start;
 extern uint32_t _stack_end;
@@ -157,8 +149,6 @@ void schedule(ctx_t *ctx)
 }
 
 
-extern void main_P1();
-extern uint32_t tos_P1;
 extern void main_console();
 extern uint32_t tos_console;
 
@@ -194,12 +184,10 @@ void hilevel_handler_rst(ctx_t *ctx)
   schedulerProcessType = PROCESS_IO;
   schedule(ctx);
 
-  // update pointer for stack segment
+  // mark stack segment as empty
   for(int i = 0; i < MAX_PROCS; i++){
     stack_used[i] = false;
   }
-  // sp = (uint32_t)&_stack_end;
-
 
   TIMER0->Timer1Load = SCHEDULER_INTERVAL; // select period = 2^20 ticks ~= 1 sec
   TIMER0->Timer1Ctrl = 0x00000002;      // select 32-bit   timer
@@ -229,9 +217,6 @@ void exec_(ctx_t *ctx)
 {
   ctx->sp = executing->tos;
   ctx->pc = ctx->gpr[0];
-  // resets the file descriptor
-  executing->fdCount = 0;
-  memset(&executing->fdActive, 0, sizeof(executing->fdActive));
 }
 
 /* Implements the fork interface
