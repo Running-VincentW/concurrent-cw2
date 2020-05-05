@@ -45,14 +45,12 @@ void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
     next_pid = '0' + next->pid;
     // context switch the page table for the MMU
     if( NULL != next->T_pt){
-      // PL011_putc(UART0, '*', true);
       mmu_set_ptr0( next->T );
       mmu_flush();
       mmu_enable();
     }
     else{
       mmu_unable();
-      mmu_flush();
     }
   }
 
@@ -173,7 +171,16 @@ void hilevel_handler_rst(ctx_t *ctx)
     procTab[i].status = STATUS_INVALID;
   }
 
-  memset(&procTab[0], 0, sizeof(pcb_t)); // initialise 0-th PCB = Console
+  mmu_set_dom( 0, 0x3 ); // set domain 0 to 11_{(2)} => manager (i.e., not checked)
+  mmu_set_dom( 1, 0x1 ); // set domain 1 to 01_{(2)} => client  (i.e.,     checked)
+
+  // initialise 0-th PCB = Console
+  memset(&procTab[0], 0, sizeof(pcb_t));
+  for (int i = 0; i < 4096; i++)
+  {
+    procTab[0].T[i] = ((pte_t)(i) << 20) | 0x00C02;
+  }
+  procTab[0].T_pt = procTab->T;
   procTab[0].pid = 1;
   procTab[0].status = STATUS_READY;
   procTab[0].tos = (uint32_t)(&tos_console);
@@ -184,21 +191,9 @@ void hilevel_handler_rst(ctx_t *ctx)
   procTab[0].schedule.lastExec = 0;
   procCount++;
 
-  // P_1 makes sure fork works
-  memset(&procTab[1], 0, sizeof(pcb_t)); // initialise 1-st PCB = P_1
-  procTab[1].pid = 2;
-  procTab[1].status = STATUS_READY;
-  procTab[1].tos = (uint32_t)(&tos_P1);
-  procTab[1].ctx.cpsr = 0x50;
-  procTab[1].ctx.pc = (uint32_t)(&main_P1);
-  procTab[1].ctx.sp = procTab[1].tos;
-  procTab[1].schedule.type = PROCESS_USR;
-  procTab[1].schedule.lastExec = 0;
-  procCount++;
 
   schedulerProcessType = PROCESS_IO;
   schedule(ctx);
-  // dispatch( ctx, NULL, &procTab[ 0 ] );
 
   // initialise the open file descriptors hashtable
   ofd_ht = ht_new();
@@ -226,11 +221,6 @@ void hilevel_handler_rst(ctx_t *ctx)
 
   int_enable_irq();
 
-
-  mmu_set_dom( 0, 0x3 ); // set domain 0 to 11_{(2)} => manager (i.e., not checked)
-  mmu_set_dom( 1, 0x1 ); // set domain 1 to 01_{(2)} => client  (i.e.,     checked)
-
-
   PL011_putc(UART0, 'K', true);
   return;
 }
@@ -250,6 +240,7 @@ void exec_(ctx_t *ctx)
  */
 void fork_(ctx_t *ctx)
 {
+  // locate a free pcb entry
   pcb_t *e = NULL;
   uint32_t eIdx = 0;
   for (int i = 0; i < procCount; i++)
@@ -284,26 +275,26 @@ void fork_(ctx_t *ctx)
 
   // copy stack memory from parent to child process
   executing->T[pAddr] &= ~0x08C00; // mask domain
-  executing->T[pAddr] |= 0x00C00;  // set  domain = 0011_{(2)} => manager
+  executing->T[pAddr] |= 0x00C00;  // set  access =  011_{(2)} => full access
   mmu_flush();
   memcpy((uint32_t *)(pTos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
   executing->T[pAddr] &= ~0x08C00; // mask domain
-  executing->T[pAddr] |= 0x00000;  // set  domain = 0001_{(2)} => client
+  executing->T[pAddr] |= 0x00000;  // set  access =  000_{(2)} => no access
   mmu_flush();
   
 
   // set up the page table for the new process
-  // mark there exist a page table for this process
-  e->T_pt = e->T;
+  e->T_pt = e->T; // mark there exist a page table for this process
   // creates a identity mapping
   for (int i = 0; i < 4096; i++)
   {
     e->T[i] = ((pte_t)(i) << 20) | 0x00C02;
   }
 
-  // set protection for stack space
+  // set protection for the stack memory
   int from = (int)&_stack_start / STACK_SIZE;
   int to = (int)&_stack_end / STACK_SIZE;
+  // restrict access to all other stack segment
   for (int i = from; i < to; i++)
   {
     e->T[i] &= ~0x001E0; // mask domain
@@ -311,6 +302,11 @@ void fork_(ctx_t *ctx)
     e->T[i] &= ~0x08C00; // mask access
     e->T[i] |= 0x00000;  // set  access =  000_{(2)} => no access
   }
+  /*
+   * All processes share the same view of their stack address,
+   * where tos = _stack_end,
+   * however the console does not have a virtual address space
+   */
   // map virtual segment to current segment
   int vAddr = to - 0x1;
   e->T[vAddr] = e->T[pAddr];
@@ -445,6 +441,7 @@ void ftruncate_(ctx_t *ctx)
   }
 }
 
+// create an open file descriptor with name
 ofd_t *createOfd(const char *name)
 {
   uint32_t c = openFdCount++;
@@ -454,6 +451,7 @@ ofd_t *createOfd(const char *name)
   return &openFd[c];
 }
 
+// kill process and child processes of process p
 void terminateChild(pcb_t *p)
 {
   // terminate child
@@ -615,12 +613,14 @@ void hilevel_handler_irq(ctx_t *ctx)
   if (id == GIC_SOURCE_TIMER0)
   {
     if(TIMER0->Timer1RIS == 1){
-      PL011_putc(UART0, '!', true);
+      // Timer 1 to invoke the scheduler for pre-emptive scheduling
+      PL011_putc(UART0, '.', true);
       ticker ++;
       schedule(ctx);
       TIMER0->Timer1IntClr = 0x01;
     }
     else if(TIMER0->Timer2RIS == 1){
+      // Timer 2 to restore sleeping processes
       resume_sleep_process();
       TIMER0->Timer2IntClr = 0x01;
     }
@@ -636,7 +636,6 @@ void hilevel_handler_pab() {
 }
 
 void hilevel_handler_dab(ctx_t *ctx) {
-  // should abort user process
   PL011_putc(UART0, '?', true);
   executing->status = STATUS_INVALID;
   schedule(ctx);

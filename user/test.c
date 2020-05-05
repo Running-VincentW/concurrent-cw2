@@ -1,39 +1,80 @@
 #include "test.h"
 
-extern void main_Tests(); 
+extern void main_Tests();
 
-void testStackProtection(){
-    // attempt access to the top of stack, assuming this is not using the top stack
-    uint32_t* ptr = (uint32_t*) 0x70700000;
-    write(STDOUT_FILENO, "\n[Test] data access to other stack\n", 36);
-    int a = *ptr;
-    write(STDOUT_FILENO, "[failed!]\n", 11);
-    return;
+void testStackProtection()
+{
+  // attempt access to the top of stack, assuming this is not using the top stack
+  uint32_t *ptr = (uint32_t *)0x70700000;
+  write(STDOUT_FILENO, "\ndata access to other stack segment [?]\n", 41);
+  int a = *ptr;
+  write(STDOUT_FILENO, "[FAIL]\n", 8);
+  exit(EXIT_SUCCESS);
 }
 
-void testVirtualMem(){
-  for (int i = 0 ; i < 5 ; i++){
-    int s = fork();
-    if(s == 0){
-      char x = '0' + i;
-      write(STDOUT_FILENO, &x, 1);
-      exit(EXIT_SUCCESS);
-    }
-  }
-  sleep(3000);
-}
+// void testSimpleFork()
+// {
+//   int a = 0;
+//   a++;
+//   pid_t pid = fork();
 
-void main_Tests() {
+//   if (pid > 0)
+//   {
+//     write(STDOUT_FILENO, "parent process [OK]\n", 21);
+//   }
+//   else if (pid == 0)
+//   {
+//     write(STDOUT_FILENO, "child process ", 15);
+//     if (a == 1)
+//     {
+//       write(STDOUT_FILENO, "[OK]\n", 6);
+//     }
+//     else
+//     {
+//       write(STDOUT_FILENO, "[FAIL]\n", 8);
+//     }
+//   }
+//   sleep(3000);
+//   exit(EXIT_SUCCESS);
+// }
+
+// void testStackAfterFork()
+// {
+//   for (int i = 0; i < 5; i++)
+//   {
+//     int s = fork();
+//     if (s == 0)
+//     {
+//       char x = '0' + i;
+//       write(STDOUT_FILENO, &x, 1);
+//       exit(EXIT_SUCCESS);
+//     }
+//   }
+//   sleep(3000);
+//   exit(EXIT_SUCCESS);
+// }
+
+void main_Tests()
+{
   int s = fork();
-  if (s==0){
-      testStackProtection();
-      exit( EXIT_SUCCESS );
+  if (s == 0)
+  {
+    testStackProtection();
   }
-  s = fork();
-  if (s==0){
-      testVirtualMem();
-      exit( EXIT_SUCCESS );
-  }
+  
+  // sleep(500);
+  // s = fork();
+  // if (s == 0)
+  // {
+  //   testSimpleFork();
+  // }
+  // 
+  // sleep(500);
+  // s = fork();
+  // if (s == 0)
+  // {
+  //   testStackAfterFork();
+  // }
   sleep(3000);
-  exit( EXIT_SUCCESS );
+  exit(EXIT_SUCCESS);
 }

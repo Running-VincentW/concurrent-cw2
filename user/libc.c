@@ -181,7 +181,6 @@ void sem_post(sem_t *sem){
 
 // void sem_destroy(sem_t *sem)
 // {
-//   //FIXME: I doesn't work.
 //   while (*sem != 0)
 //   {
 //     asm volatile("nop");
@@ -217,7 +216,7 @@ int shm_unlink(const char *name){
               : "r0" );
   return r;
 };
-typedef uint32_t off_t; //TODO: check if type valid
+typedef uint32_t off_t;
 int ftruncate(int fildes, off_t length){
   int r;
   asm volatile( "mov r0, %2 \n" // assign r0 = fildes
