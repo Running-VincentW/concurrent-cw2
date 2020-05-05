@@ -1,3 +1,6 @@
+/* This is an alternate solution using Chandy/ Misra's algorithm
+ */
+
 #include "libc.h"
 
 typedef enum
@@ -9,21 +12,22 @@ typedef enum
 
 typedef struct
 {
-    int pid;
-    forkStateAlt_t fork_state;
-    sem_t *mutex;
-    bool is_requested;
-    int requested_by;
+               int          pid;
+    forkStateAlt_t   fork_state;
+             sem_t       *mutex;
+              bool is_requested;
+               int requested_by;
 } forkAlt_t;
 
 typedef struct
 {
-    forkAlt_t *left;
-    forkAlt_t *right;
-    int pid;
-    int eat_count;
+    forkAlt_t     *left;
+    forkAlt_t    *right;
+          int       pid;
+          int eat_count;
 } philosopherAlt_t;
 
+// set name to console friendly output e.g. 8 -> ph_08
 void namePsAlt(char *name, int pid)
 {
     int d1 = (pid % 100) / 10;
@@ -37,6 +41,7 @@ void namePsAlt(char *name, int pid)
     return;
 }
 
+// creates a output message for a philosopher's action, e.g. ph_08 eats
 void composeMsgAlt(char *s, int pid, char *action)
 {
     namePsAlt(s, pid);
@@ -44,8 +49,10 @@ void composeMsgAlt(char *s, int pid, char *action)
     strcpy(&s[6], action);
 }
 
+// let a philosopher to eat
 void eatAlt(philosopherAlt_t *p)
 {
+    // update the state of the fork to being used
     sem_wait(p->left->mutex);
     p->left->fork_state = USING;
     sem_post(p->left->mutex);
@@ -56,9 +63,12 @@ void eatAlt(philosopherAlt_t *p)
     char msg[15];
     composeMsgAlt(msg, p->pid, "eats\n");
     write(STDOUT_FILENO, msg, 12);
-    sleep(300);
-    // finish eating, mark fork as dirty
     p->eat_count++;
+    sleep(300);
+    /* After eating, the forks become dirty.
+     * If another philosopher requested the fork,
+     * the philosopher cleans the fork and pass it over.
+     */
     sem_wait(p->left->mutex);
     p->left->fork_state = DIRTY;
     if (p->left->is_requested == true)
@@ -77,13 +87,12 @@ void eatAlt(philosopherAlt_t *p)
         p->right->fork_state = CLEAN;
     }
     sem_post(p->right->mutex);
-    // logs finish eating
     composeMsgAlt(msg, p->pid, "thinks\n");
     write(STDOUT_FILENO, msg, 14);
-    // sleep(300);
     return;
 }
 
+// check if a philosopher have both forks to eat
 bool haveBothForksAlt(philosopherAlt_t *p)
 {
     bool r;
@@ -95,9 +104,14 @@ bool haveBothForksAlt(philosopherAlt_t *p)
     return r;
 }
 
+// obtain a fork or send a request to obtain fork
 void getForkAlt(philosopherAlt_t *p, forkAlt_t *fork)
 {
     sem_wait(fork->mutex);
+    /* If another philosopher have the fork,
+     * the other philosopher will clean and pass the fork
+     * if the fork is dirty, else kept it.
+     */
     if (fork->pid != p->pid)
     {
         if (fork->fork_state == DIRTY)
@@ -116,12 +130,15 @@ void getForkAlt(philosopherAlt_t *p, forkAlt_t *fork)
     return;
 }
 
+// The philosopher instances
 void philosopherAlt(philosopherAlt_t* p)
 {
     while (true)
     {
+        // get both forks
         getForkAlt(p, p->left);
         getForkAlt(p, p->right);
+        // eat only if philosopher have both forks
         if(haveBothForksAlt(p) == true) eatAlt(p);
         sleep(300);
     }
@@ -137,6 +154,8 @@ void main_PsAlt()
 {
     int n = 16;
 
+    // Initialise the forks, and the mutex within a fork
+    // At first, the forks are assigned to the philosophers with the lower ID.
     for (int i = 0; i < n; i++)
     {
         memset(&forks_alt[i], 0, sizeof(forkAlt_t));
@@ -158,7 +177,7 @@ void main_PsAlt()
         }
     }
 
-    // philosophers have names ph_0 ... ph_15
+    // Initialise the philosophers and assign forks to philosophers
     for (int i = 0; i < n; i++)
     {
         philosopherAlt_t *x = &philosophers_alt[i];
@@ -185,7 +204,11 @@ void main_PsAlt()
         }
     }
 
-    // Performance count
+    /* The philospher will terminate after one minute
+     * set a break point on line including d1, d2, d3,
+     * to inspect the values of min and max (eat count of individual philosophers)
+     * to verify no philosophers suffers from resource starvation.
+     */
     sleep(60000);
     int min = philosophers_alt[0].eat_count;
     int max = philosophers_alt[0].eat_count;
@@ -203,7 +226,7 @@ void main_PsAlt()
         }
         total += c;
     }
-    int d1, d2, d3;
+    int d1, d2, d3; // break here to inspect min and max
     char msg[15];
     d1 = ((total % 1000) / 100) + '0';
     d2 = ((total %  100) /  10) + '0';

@@ -4,10 +4,12 @@ extern void main_Tests();
 
 void testStackProtection()
 {
-  // attempt access to the top of stack, assuming this is not using the top stack
+  // attempt access to the top of stack
   uint32_t *ptr = (uint32_t *)0x70700000;
   write(STDOUT_FILENO, "\ndata access to other stack segment [?]\n", 41);
   int a = *ptr;
+  // the dab handler should terminate this process and prints a '?'
+  // Therefore the following shall not execute
   write(STDOUT_FILENO, "[FAIL]\n", 8);
   exit(EXIT_SUCCESS);
 }

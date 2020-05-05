@@ -1,13 +1,18 @@
+/* This is the final solution for the dining philosophers problem, 
+ * using resource hierachy algorithm.
+ */
+
 #include "libc.h"
 
 typedef struct
 {
     int pid;
-    sem_t *first;
+    sem_t *first; // denotes the order to pick up the forks
     sem_t *second;
     int eat_count;
 } philosopher_t;
 
+// set name to console friendly output e.g. 8 -> ph_08
 void namePs(char *name, int pid)
 {
     int d1 = (pid % 100) / 10;
@@ -21,6 +26,7 @@ void namePs(char *name, int pid)
     return;
 }
 
+// creates a output message for a philosopher's action, e.g. ph_08 eats
 void composeMsg(char *s, int pid, char *action)
 {
     namePs(s, pid);
@@ -28,12 +34,14 @@ void composeMsg(char *s, int pid, char *action)
     strcpy(&s[6], action);
 }
 
+// The philosopher instances
 void philosopher(philosopher_t *p)
 {
-    char msg[15];
+    char msg[15]; // debug message that will output to console
     while (true)
     {
         // hungry
+        // obtain forks in order with the fork's id
         sem_wait(p->first);
         sem_wait(p->second);
         // eat
@@ -41,7 +49,7 @@ void philosopher(philosopher_t *p)
         write(STDOUT_FILENO, msg, 12);
         p->eat_count++;
         sleep(300);
-        sem_post(p->first);
+        sem_post(p->first); // release fork after eating
         sem_post(p->second);
         // think
         composeMsg(msg, p->pid, "thinks\n");
@@ -57,7 +65,7 @@ philosopher_t philosophers[20];
 void main_Ps()
 {
     int n = 16;
-    // assign a mutex to each resource (fork)
+    // assign a mutex to each fork
     for (int i = 0; i < n; i++)
     {
         sem_init(&forkMutex[i], 1);
@@ -97,7 +105,11 @@ void main_Ps()
         }
     }
 
-    // Performance count
+    /* The philospher will terminate after one minute
+     * set a break point on line including d1, d2, d3,
+     * to inspect the values of min and max (eat count of individual philosophers)
+     * to verify no philosophers suffers from resource starvation.
+     */
     sleep(60000);
     int min = philosophers[0].eat_count;
     int max = philosophers[0].eat_count;
@@ -115,7 +127,7 @@ void main_Ps()
         }
         total += c;
     }
-    int d1, d2, d3;
+    int d1, d2, d3; // break here to inspect min and max
     char msg[15];
     d1 = ((total % 1000) / 100) + '0';
     d2 = ((total %  100) /  10) + '0';
