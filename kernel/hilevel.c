@@ -6,7 +6,6 @@
  */
 
 #include "hilevel.h"
-#include "hash_table.h"
 
 pcb_t procTab[MAX_PROCS];
 pcb_t *executing = NULL;
@@ -19,7 +18,6 @@ uint32_t procCount = 0;
  */
 ofd_t openFd[OFD_MAX];
 uint32_t openFdCount = 0;
-ht_hash_table *ofd_ht;
 
 // scheduler related, ticker simulates a RTC, incremented every millisecond
 uint32_t ticker = 0;
@@ -196,9 +194,6 @@ void hilevel_handler_rst(ctx_t *ctx)
   schedulerProcessType = PROCESS_IO;
   schedule(ctx);
 
-  // initialise the open file descriptors hashtable
-  ofd_ht = ht_new();
-
   // update pointer for stack segment
   for(int i = 0; i < MAX_PROCS; i++){
     stack_used[i] = false;
@@ -334,136 +329,6 @@ void fork_(ctx_t *ctx)
   ctx->gpr[0] = e->pid;
 }
 
-void shm_open_(ctx_t *ctx)
-{
-  // check if # of file descriptor exceeded max limit
-  if (executing->fdCount == OPEN_MAX)
-  {
-    ctx->gpr[0] = -1;
-  }
-  else
-  {
-    int fdIdx;
-    // create a fd for the PCB
-    for (int i = 0; i < OPEN_MAX; i++)
-    {
-      if (executing->fdActive[i] == false)
-      {
-        fdIdx = i;
-        break;
-      }
-    }
-    bool new = false;
-    ofd_t *ofd = NULL;
-    // lookup the open file descriptor by name
-    int val = ht_search(ofd_ht, (char *)ctx->gpr[0]);
-    if (val != 0)
-    {
-      // do nothing yet if the ofd already exist
-      ofd = (ofd_t *)val;
-    }
-    else if (openFdCount < OFD_MAX)
-    {
-      // if the ofd doesn't exist, find a entry to create an ofd and set new = true
-      new = true;
-      for (int i = 0; i < OFD_MAX; i++)
-      {
-        if (openFd[i].active == false)
-        {
-          ofd = &openFd[i];
-          break;
-        }
-      }
-    }
-    if (ofd != NULL)
-    {
-      if (new == true)
-      {
-        // initialize an ofd
-        memset(ofd, 0, sizeof(ofd_t));
-        strcpy(ofd->name, (char *)ctx->gpr[0]);
-        ofd->active = true;
-        ofd->bytes = 0;
-        ofd->object = NULL;
-        // create entry in hashtable lookup
-        ht_insert(ofd_ht, (char *)ctx->gpr[0], (uint32_t)ofd);
-      }
-      // update fd
-      executing->fdActive[fdIdx] = true;
-      executing->fd[fdIdx] = ofd;
-      // return fd
-      ctx->gpr[0] = fdIdx;
-    }
-    else
-    {
-      // unable to create ofd due to insufficient ofd entries within the data structure
-      ctx->gpr[0] = -1;
-    }
-  }
-}
-
-void ftruncate_(ctx_t *ctx)
-{
-  // find ofd of fd
-
-  // check if valid FD
-  if (executing->fdActive[ctx->gpr[0]] == false)
-  {
-    ctx->gpr[0] = -1;
-  }
-  else
-  {
-    // check if we need to realloc or malloc a shared memory object
-    ofd_t *ofd = executing->fd[ctx->gpr[0]];
-    void *ptr;
-    uint32_t size = ctx->gpr[1];
-    if (ofd->object == NULL)
-    { // create a memory shared object
-      ptr = malloc(size);
-    }
-    else if (ofd->object != NULL && size != ofd->bytes)
-    { // resize the shared memory object
-      ptr = malloc(size);
-      if (size < ofd->bytes)
-      {
-        memcpy(ptr, ofd->object, size);
-      }
-      else
-      {
-        memcpy(ptr, ofd->object, ofd->bytes);
-      }
-    }
-    else
-    { // keep the shared memory object
-      ptr = ofd->object;
-    }
-    if (ptr != NULL)
-    {
-      if (ptr != ofd->object)
-      {
-        free(ofd->object);
-      }
-      ofd->object = ptr;
-      ofd->bytes = size;
-      ctx->gpr[0] = 0;
-    }
-    else
-    {
-      ctx->gpr[0] = -1;
-    }
-  }
-}
-
-// create an open file descriptor with name
-ofd_t *createOfd(const char *name)
-{
-  uint32_t c = openFdCount++;
-  memset(&openFd[c], 0, sizeof(ofd_t));
-  openFd[c].active = true;
-  strcpy(openFd[c].name, name);
-  return &openFd[c];
-}
-
 // kill process and child processes of process p
 void terminateChild(pcb_t *p)
 {
@@ -536,58 +401,6 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
     break;
   }
   case 0x08:
-  { // 0x08 => shmopen(name)
-    shm_open_(ctx);
-    break;
-  }
-  case 0x09:
-  { // 0x09 => ftruncate (fd, len)
-    ftruncate_(ctx);
-    break;
-  }
-  case 0x0A:
-  { // mmap (fd)
-    // FIXME: I need to be a proper memory mapping
-    if (executing->fdActive[ctx->gpr[0]])
-    {
-      ofd_t *ofd = executing->fd[ctx->gpr[0]];
-      ctx->gpr[0] = (uint32_t)ofd->object;
-      //TODO: store attach info
-    }
-    else
-    {
-      ctx->gpr[0] = 0;
-    }
-    break;
-  }
-  case 0x0B:
-  { // munmap (addr, len)
-    // TODO: we need to be able to dettach the process from a shared memory object
-    break;
-  }
-  case 0x0C:
-  { // shm_unlink (name)
-    uint32_t r = ht_search(ofd_ht, (char *)ctx->gpr[0]);
-    if (r == 0)
-    {
-      ctx->gpr[0] = -1;
-    }
-    else
-    {
-      // TODO: check if any process is still mapped to it...
-      ofd_t *ofd = (ofd_t *)r;
-      // remove the shared memory object from heap mem
-      free(ofd->object);
-      // set ofd to unactive so that we can reuse it
-      ofd->active = false;
-      // remove the hashtable entry that maps the name to the ofd
-      ht_delete(ofd_ht, (char *)ctx->gpr[0]);
-      ctx->gpr[0] = 0;
-    }
-
-    break;
-  }
-  case 0x0D:
   { // sleep(sec)
     executing->slp_sec = ctx->gpr[0];
     executing->status = STATUS_WAITING;

@@ -39,12 +39,7 @@ typedef int pid_t;
 #define SYS_EXEC      ( 0x05 )
 #define SYS_KILL      ( 0x06 )
 #define SYS_NICE      ( 0x07 )
-#define SYS_SHM_OPEN  ( 0x08 )
-#define SYS_FTRUNCATE ( 0x09 )
-#define SYS_MMAP      ( 0x0A )
-#define SYS_MUNMAP    ( 0x0B )
-#define SYS_SHM_UNLINK ( 0x0C )
-#define SYS_SLEEP ( 0x0D )
+#define SYS_SLEEP     ( 0x08 )
 
 #define SIG_TERM      ( 0x00 )
 #define SIG_QUIT      ( 0x01 )

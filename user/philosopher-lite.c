@@ -1,5 +1,4 @@
 #include "libc.h"
-#include "hash_table.h"
 
 typedef struct
 {
@@ -41,13 +40,13 @@ void philosopher(philosopher_t *p)
         composeMsg(msg, p->pid, "eats\n");
         write(STDOUT_FILENO, msg, 12);
         p->eat_count++;
-        sleep(3000);
+        sleep(300);
         sem_post(p->first);
         sem_post(p->second);
         // think
         composeMsg(msg, p->pid, "thinks\n");
         write(STDOUT_FILENO, msg, 14);
-        sleep(1000);
+        sleep(300);
     }
     return;
 }

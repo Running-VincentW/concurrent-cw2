@@ -36,9 +36,9 @@ void gets( char* x, int n ) {
 
 extern void main_P3(); 
 extern void main_P4(); 
-extern void main_P5(); 
-extern void main_P6();
+extern void main_P5();
 extern void main_Ps();
+extern void main_PsAlt();
 extern void main_Tests();
 
 void* load( char* x ) {
@@ -53,8 +53,8 @@ void* load( char* x ) {
   else if( 0 == strcmp( x, "P5" ) ) {
     return &main_P5;
   }
-  else if ( 0 == strcmp( x, "P6" )){
-    return &main_P6;
+  else if ( 0 == strcmp( x, "ps2" )){
+    return &main_PsAlt;
   }
   else if ( 0 == strcmp( x, "ps" )){
     return &main_Ps;
