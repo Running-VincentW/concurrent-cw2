@@ -18,8 +18,10 @@ processType_t schedulerProcessType;
 
 // stack segment related, sp points to tos of next stack frame
 bool stack_used[MAX_PROCS];
+uint32_t stack_process[MAX_PROCS];
 extern uint32_t _stack_start;
 extern uint32_t _stack_end;
+int stackC;
 
 void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
 {
@@ -173,6 +175,7 @@ void hilevel_handler_rst(ctx_t *ctx)
   procTab[0].pid = 1;
   procTab[0].status = STATUS_READY;
   procTab[0].tos = (uint32_t)(&tos_console);
+  procTab[0].bos = procTab[0].tos - STACK_SIZE;
   procTab[0].ctx.cpsr = 0x50;
   procTab[0].ctx.pc = (uint32_t)(&main_console);
   procTab[0].ctx.sp = procTab[0].tos;
@@ -188,6 +191,7 @@ void hilevel_handler_rst(ctx_t *ctx)
   for(int i = 0; i < MAX_PROCS; i++){
     stack_used[i] = false;
   }
+  stackC = ((int)&_stack_end - (int)&_stack_start) / STACK_SIZE;
 
   TIMER0->Timer1Load = SCHEDULER_INTERVAL; // select period = 2^20 ticks ~= 1 sec
   TIMER0->Timer1Ctrl = 0x00000002;      // select 32-bit   timer
@@ -219,6 +223,35 @@ void exec_(ctx_t *ctx)
   ctx->pc = ctx->gpr[0];
 }
 
+// Creates/ expands to a new page for the stack segment, and returns the physical address of the page frame
+uint32_t newStackPage(ctx_t *ctx, pcb_t* process)
+{
+  PL011_putc(UART0, '+', true);
+  // locate an available physical page frame
+  uint32_t frameAddr = 0;
+  for(int i = 0; i < stackC; i++){
+    if(stack_used[i] == false){
+      stack_used[i] = true;
+      stack_process[i] = process->pid;
+      // frameAddr: the address of the page frame
+      frameAddr = (uint32_t)&_stack_end - STACK_SIZE * (i+1);
+      break;
+    }
+  }
+  // update the page table
+  int pFrameIdx = frameAddr / STACK_SIZE;
+  process->bos -= STACK_SIZE;
+  int pageIdx = process->bos / STACK_SIZE;
+
+  // map the virtual address of page to page frame
+  process->T[pageIdx] = process->T[pFrameIdx];
+  // grant access to current stack segment
+  process->T[pageIdx] &= ~0x08C00; // mask access
+  process->T[pageIdx] |= 0x00C00;  // set access = 011_{(2)} => full access
+
+  return frameAddr;
+}
+
 /* Implements the fork interface
  * creates a new PCB entry which preserve the ctx and stack memory but with a unique PID
  */
@@ -238,8 +271,17 @@ void fork_(ctx_t *ctx)
   }
   if (e == NULL)
   {
-    eIdx = procCount++;
-    e = &procTab[eIdx];
+    if(procCount <= MAX_PROCS)
+    {
+      eIdx = procCount++;
+      e = &procTab[eIdx];
+    }
+    else
+    {
+      PL011_putc(UART0, 'X', true);
+      return;
+    }
+    
   }
   // copy ctx from parent to child process
   memset(e, 0, sizeof(pcb_t));
@@ -250,40 +292,18 @@ void fork_(ctx_t *ctx)
   e->schedule = executing->schedule;
   e->schedule.type = PROCESS_USR;
   e->parent = executing->pid;
+  e->tos = (uint32_t)&_stack_end;
+  e->bos = (uint32_t)&_stack_end;
+  e->ctx.sp = e->tos - executing->tos + ctx->sp; // can replace this with = ctx->sp
 
 
-  // Create a new stack segment
-  uint32_t pTos = 0;
-  for(int i = 0; i < MAX_PROCS; i++){
-    if(stack_used[i] == false){
-      stack_used[i] = true;
-      e->stack_pos = i;
-      pTos = (uint32_t)&_stack_end - STACK_SIZE * i;
-      break;
-    }
-  }
-  // uint32_t pTos = sp;
-  // sp -= STACK_SIZE;
-  int pAddr = ((int)pTos - STACK_SIZE) / STACK_SIZE;
-
-  // copy stack memory from parent to child process
-  executing->T[pAddr] &= ~0x08C00; // mask domain
-  executing->T[pAddr] |= 0x00C00;  // set  access =  011_{(2)} => full access
-  mmu_flush();
-  memcpy((uint32_t *)(pTos - STACK_SIZE), (uint32_t *)(executing->tos - STACK_SIZE), STACK_SIZE);
-  executing->T[pAddr] &= ~0x08C00; // mask domain
-  executing->T[pAddr] |= 0x00000;  // set  access =  000_{(2)} => no access
-  mmu_flush();
-  
-
-  // set up the page table for the new process
-  e->T_pt = e->T; // mark there exist a page table for this process
+  /* Initialize the page table*/
+  e->T_pt = e->T; // mark the existence of a page table
   // creates a identity mapping
   for (int i = 0; i < 4096; i++)
   {
     e->T[i] = ((pte_t)(i) << 20) | 0x00C02;
   }
-
   // set protection for the stack memory
   int from = (int)&_stack_start / STACK_SIZE;
   int to = (int)&_stack_end / STACK_SIZE;
@@ -295,20 +315,31 @@ void fork_(ctx_t *ctx)
     e->T[i] &= ~0x08C00; // mask access
     e->T[i] |= 0x00000;  // set  access =  000_{(2)} => no access
   }
-  /*
-   * All processes share the same view of their stack address,
-   * where tos = _stack_end,
-   * however the console does not have a virtual address space
-   */
-  // map virtual segment to current segment
-  int vAddr = to - 0x1;
-  e->T[vAddr] = e->T[pAddr];
-  // grant access to current stack segment
-  e->T[vAddr] &= ~0x08C00; // mask access
-  e->T[vAddr] |= 0x00C00;  // set access = 011_{(2)} => full access
 
-  e->tos = (uint32_t)&_stack_end;
-  e->ctx.sp = e->tos - executing->tos + ctx->sp;
+
+  /* Virtual Memory and pages*/
+  int pageCount = (executing->tos - executing->bos) / STACK_SIZE; // pages of stack in executing process
+  int swpIdx = (uint32_t)&_stack_end / STACK_SIZE;
+  uint32_t* swpAddr = &_stack_end;
+
+  for (int i = 1; i <= pageCount; i++){
+    // create a new page in the new processes per page in executing process
+    uint32_t frameAddr = newStackPage(ctx, e);
+    int pFrameIdx = frameAddr / STACK_SIZE;
+    /* swpAddr will act as a temporary address for us to copy 
+     * from the page frame of the executing process to the new process.
+     * entry executing->T[swpIdx] will make sure the temporary address 
+     * maps to the physical page frame corresponding to the new process.
+     */
+    pte_t swp = executing->T[swpIdx];
+    executing->T[swpIdx] = executing->T[pFrameIdx];
+    executing->T[swpIdx] &= ~0x08C00; // mask domain
+    executing->T[swpIdx] |= 0x00C00;  // set  access =  011_{(2)} => full access
+    mmu_flush();
+    memcpy(swpAddr, (uint32_t *)(executing->tos - STACK_SIZE * i), STACK_SIZE);
+    executing->T[swpIdx] = swp;
+    mmu_flush();
+  }
 
   // return child process PID to parent process
   ctx->gpr[0] = e->pid;
@@ -326,7 +357,14 @@ void terminateChild(pcb_t *p)
     }
   }
   // terminate self
-  stack_used[p->stack_pos] = false;
+  for (int i = 0; i < stackC; i++)
+  {
+    if (stack_process[i] == p->pid)
+    {
+      stack_process[i] = 0;
+      stack_used[i] = false;
+    }
+  }
   p->status = STATUS_TERMINATED;
 }
 
@@ -448,8 +486,16 @@ void hilevel_handler_pab() {
 }
 
 void hilevel_handler_dab(ctx_t *ctx) {
-  PL011_putc(UART0, '?', true);
-  executing->status = STATUS_INVALID;
-  schedule(ctx);
+  uint32_t* addr = (uint32_t*)ctx->gpr[3];
+  // allocate a new page frame if the stack overflow the existing pages
+  if (ctx->sp < executing->bos){
+    PL011_putc(UART0, '*', true);
+    newStackPage(ctx, executing);
+  }
+  else{
+    PL011_putc(UART0, '?', true);
+    executing->status = STATUS_INVALID;
+    schedule(ctx);
+  }
   return;
 }

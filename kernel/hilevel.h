@@ -82,7 +82,7 @@ typedef struct {
         pid_t                pid; // Process IDentifier (PID)
      status_t             status; // current status
      uint32_t                tos; // address of Top of Stack (ToS)
-     uint32_t          stack_pos;
+     uint32_t                bos; // address of Bottom of Stack
         ctx_t                ctx; // execution context
   scheduler_t           schedule; // scheduler info
      uint32_t            slp_sec; // sleep duration upon sleep sys call
