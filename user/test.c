@@ -14,31 +14,46 @@ void testStackProtection()
   exit(EXIT_SUCCESS);
 }
 
-// void testSimpleFork()
-// {
-//   int a = 0;
-//   a++;
-//   pid_t pid = fork();
+void testStackOverflow()
+{
+  char a[0xFFFE9];
+  strcpy(a, "abc");
+  if (strcmp(a, "abc") == 0)
+  {
+    write(STDOUT_FILENO, "[OK]\n", 6);
+  }
+  else
+  {
+    write(STDOUT_FILENO, "[FAIL]\n", 8);
+  }
+  exit(EXIT_SUCCESS);
+}
 
-//   if (pid > 0)
-//   {
-//     write(STDOUT_FILENO, "parent process [OK]\n", 21);
-//   }
-//   else if (pid == 0)
-//   {
-//     write(STDOUT_FILENO, "child process ", 15);
-//     if (a == 1)
-//     {
-//       write(STDOUT_FILENO, "[OK]\n", 6);
-//     }
-//     else
-//     {
-//       write(STDOUT_FILENO, "[FAIL]\n", 8);
-//     }
-//   }
-//   sleep(3000);
-//   exit(EXIT_SUCCESS);
-// }
+void testSimpleFork()
+{
+  int a = 0;
+  a++;
+  pid_t pid = fork();
+
+  if (pid > 0)
+  {
+    write(STDOUT_FILENO, "parent process [OK]\n", 21);
+  }
+  else if (pid == 0)
+  {
+    write(STDOUT_FILENO, "child process ", 15);
+    if (a == 1)
+    {
+      write(STDOUT_FILENO, "[OK]\n", 6);
+    }
+    else
+    {
+      write(STDOUT_FILENO, "[FAIL]\n", 8);
+    }
+  }
+  sleep(3000);
+  exit(EXIT_SUCCESS);
+}
 
 // void testStackAfterFork()
 // {
@@ -61,7 +76,7 @@ void main_Tests()
   int s = fork();
   if (s == 0)
   {
-    testStackProtection();
+    testStackOverflow();
   }
   
   // sleep(500);
