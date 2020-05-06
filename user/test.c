@@ -2,6 +2,7 @@
 
 extern void main_Tests();
 
+/* Test if the kernel blocks access to other page frame*/
 void testStackProtection()
 {
   // attempt access to the top of stack
@@ -14,8 +15,18 @@ void testStackProtection()
   exit(EXIT_SUCCESS);
 }
 
+/* This test if the kernel if able to handle stack memory that overflows a page.
+ * 
+ * Testing procedures:
+ * - `watch stack_process`     set a watch point to see which page frame is allocated to which process
+ * - `break testStackOverflow` break the current test function to inspect variables
+ * - `execute tests`           run the test
+ * - `p/x &a`                  inspect the value of &a lies in page 0x721XXXXX,
+ * - `p/x executing->bos`      should reveal bottom of stack is now 0x72100000 (was 0x72200000).
+ */
 void testStackOverflow()
 {
+  write(STDOUT_FILENO, "\ntest stack memory overflow a page ", 35);
   char a[0xFFFE9];
   strcpy(a, "abc");
   if (strcmp(a, "abc") == 0)
