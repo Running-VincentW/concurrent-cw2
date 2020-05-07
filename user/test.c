@@ -87,15 +87,15 @@ void main_Tests()
   int s = fork();
   if (s == 0)
   {
-    testStackOverflow();
+    testStackProtection();
   }
   
-  // sleep(500);
-  // s = fork();
-  // if (s == 0)
-  // {
-  //   testSimpleFork();
-  // }
+  sleep(500);
+  s = fork();
+  if (s == 0)
+  {
+    testStackOverflow();
+  }
   // 
   // sleep(500);
   // s = fork();
