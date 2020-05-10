@@ -34,7 +34,7 @@ void namePsAlt(char *name, int pid)
     int d2 = (pid % 10) / 1;
     name[0] = 'p';
     name[1] = 'h';
-    name[2] = '_';
+    name[2] = '-';
     itoa(&name[3], d1);
     itoa(&name[4], d2);
     name[5] = 0;
@@ -201,6 +201,10 @@ void main_PsAlt()
         {
             philosopherAlt(&philosophers_alt[i]);
             break;
+        }
+        else if (c == -1)
+        {
+            exit(EXIT_FAILURE);
         }
     }
 

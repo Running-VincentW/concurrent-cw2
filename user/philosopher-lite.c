@@ -103,6 +103,10 @@ void main_Ps()
             philosopher(&philosophers[i]);
             break;
         }
+        else if (c == -1)
+        {
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* The philospher will terminate after one minute
@@ -110,7 +114,7 @@ void main_Ps()
      * to inspect the values of min and max (eat count of individual philosophers)
      * to verify no philosophers suffers from resource starvation.
      */
-    sleep(60000);
+    sleep(30000);
     int min = philosophers[0].eat_count;
     int max = philosophers[0].eat_count;
     int total = 0;

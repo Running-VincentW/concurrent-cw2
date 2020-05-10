@@ -17,11 +17,12 @@ uint32_t ticker = 0;
 processType_t schedulerProcessType;
 
 // stack segment related, sp points to tos of next stack frame
-bool stack_used[MAX_PROCS];
-uint32_t stack_process[MAX_PROCS];
+uint32_t stack_count; // count the number of stack frames in use
+bool stack_used[MAX_PROCS]; // indicates a stack frame is in use
+uint32_t stack_process[MAX_PROCS]; // indicates which processes uses a stack frame
 extern uint32_t _stack_start;
 extern uint32_t _stack_end;
-int stackC;
+int stackC; // total number of stack frames
 
 void dispatch(ctx_t *ctx, pcb_t *prev, pcb_t *next)
 {
@@ -84,7 +85,7 @@ void schedule(ctx_t *ctx)
   pcb_t *next = NULL;
 
   // find prev PCB
-  for (int i = 0; i < procCount; i++)
+  for (int i = 0; i < MAX_PROCS; i++)
   {
     if (procTab[i].pid == executing->pid)
     {
@@ -110,7 +111,7 @@ void schedule(ctx_t *ctx)
    * processExist keep track whether a queue is empty (i.e. only the console process)
    * oldestPcb keep track of the longest waiting process in a queue
    */
-  for (int i = 0; i < procCount; i++)
+  for (int i = 0; i < MAX_PROCS; i++)
   {
     pcb_t *ith = &procTab[i];
     if (ith->status == STATUS_READY &&
@@ -191,7 +192,8 @@ void hilevel_handler_rst(ctx_t *ctx)
   for(int i = 0; i < MAX_PROCS; i++){
     stack_used[i] = false;
   }
-  stackC = ((int)&_stack_end - (int)&_stack_start) / STACK_SIZE;
+  stack_count = 0;
+  stackC = ((int)&_stack_end - (int)&_stack_start) / STACK_SIZE -1;
 
   TIMER0->Timer1Load = SCHEDULER_INTERVAL; // select period = 2^20 ticks ~= 1 sec
   TIMER0->Timer1Ctrl = 0x00000002;      // select 32-bit   timer
@@ -224,7 +226,7 @@ void exec_(ctx_t *ctx)
 }
 
 // Creates/ expands to a new page for the stack segment, and returns the physical address of the page frame
-uint32_t newStackPage(ctx_t *ctx, pcb_t* process)
+uint32_t newStackPage(pcb_t* process)
 {
   PL011_putc(UART0, '+', true);
   // locate an available physical page frame
@@ -232,11 +234,16 @@ uint32_t newStackPage(ctx_t *ctx, pcb_t* process)
   for(int i = 0; i < stackC; i++){
     if(stack_used[i] == false){
       stack_used[i] = true;
+      stack_count ++;
       stack_process[i] = process->pid;
       // frameAddr: the address of the page frame
       frameAddr = (uint32_t)&_stack_end - STACK_SIZE * (i+1);
       break;
     }
+  }
+  if (frameAddr == 0){
+    process->status = STATUS_INVALID;
+    return -1;
   }
   // update the page table
   int pFrameIdx = frameAddr / STACK_SIZE;
@@ -259,29 +266,28 @@ void fork_(ctx_t *ctx)
 {
   // locate a free pcb entry
   pcb_t *e = NULL;
-  uint32_t eIdx = 0;
-  for (int i = 0; i < procCount; i++)
+  int eIdx = 0;
+  for (int i = 0; i < MAX_PROCS; i++)
   {
-    if (procTab[i].status == STATUS_TERMINATED)
+    if (procTab[i].status == STATUS_TERMINATED || procTab[i].status == STATUS_INVALID)
     {
       e = &procTab[i];
       eIdx = i;
       break;
     }
   }
-  if (e == NULL)
+
+  int pageCount = (executing->tos - executing->bos) / STACK_SIZE; // pages of stack in executing process
+  bool valid = stack_count + pageCount < stackC;
+  /* Return -1 if fork fails, possible reasons are
+   * i) insufficient free PCB entries (limited by MAX_PROCS),
+   * ii) insufficient free page frames for stack pages to map to.
+   */
+  if (e == NULL || valid == false)
   {
-    if(procCount <= MAX_PROCS)
-    {
-      eIdx = procCount++;
-      e = &procTab[eIdx];
-    }
-    else
-    {
-      PL011_putc(UART0, 'X', true);
-      return;
-    }
-    
+    ctx->gpr[0] = -1;
+    PL011_putc(UART0, 'X', true);
+    return;
   }
   // copy ctx from parent to child process
   memset(e, 0, sizeof(pcb_t));
@@ -295,6 +301,7 @@ void fork_(ctx_t *ctx)
   e->tos = (uint32_t)&_stack_end;
   e->bos = (uint32_t)&_stack_end;
   e->ctx.sp = e->tos - executing->tos + ctx->sp; // can replace this with = ctx->sp
+  procCount ++;
 
 
   /* Initialize the page table*/
@@ -318,13 +325,13 @@ void fork_(ctx_t *ctx)
 
 
   /* Virtual Memory and pages*/
-  int pageCount = (executing->tos - executing->bos) / STACK_SIZE; // pages of stack in executing process
+  // int pageCount = (executing->tos - executing->bos) / STACK_SIZE; // pages of stack in executing process
   int swpIdx = (uint32_t)&_stack_end / STACK_SIZE;
   uint32_t* swpAddr = &_stack_end;
 
   for (int i = 1; i <= pageCount; i++){
     // create a new page in the new processes per page in executing process
-    uint32_t frameAddr = newStackPage(ctx, e);
+    uint32_t frameAddr = newStackPage(e);
     int pFrameIdx = frameAddr / STACK_SIZE;
     /* swpAddr will act as a temporary address for us to copy 
      * from the page frame of the executing process to the new process.
@@ -349,7 +356,7 @@ void fork_(ctx_t *ctx)
 void terminateChild(pcb_t *p)
 {
   // terminate child
-  for (int i = 0; i < procCount; i++)
+  for (int i = 0; i < MAX_PROCS; i++)
   {
     if (procTab[i].parent == p->pid)
     {
@@ -363,8 +370,10 @@ void terminateChild(pcb_t *p)
     {
       stack_process[i] = 0;
       stack_used[i] = false;
+      stack_count --;
     }
   }
+  procCount --;
   p->status = STATUS_TERMINATED;
 }
 
@@ -399,7 +408,6 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   }
   case 0x04:
   { // 0x04 => exit
-    executing->status = STATUS_TERMINATED;
     terminateChild(executing);
     schedule(ctx);
     break;
@@ -412,7 +420,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
   case 0x06:
   { // 0x06 => kill
     pid_t pid = (pid_t)ctx->gpr[0];
-    for (int i = 0; i < procCount; i++)
+    for (int i = 0; i < MAX_PROCS; i++)
     {
       if (procTab[i].pid == pid)
       {
@@ -442,7 +450,7 @@ void hilevel_handler_svc(ctx_t *ctx, uint32_t id)
 // decrement the seconds elapsed for sleeping process and wake up process after sleep
 void resume_sleep_process()
 {
-  for(int i = 0; i < procCount; i++){
+  for(int i = 0; i < MAX_PROCS; i++){
     pcb_t *c = &procTab[i];
     if(c->status == STATUS_WAITING){
       if(c->slp_sec <= 1){
@@ -490,7 +498,12 @@ void hilevel_handler_dab(ctx_t *ctx) {
   // allocate a new page frame if the stack overflow the existing pages
   if (ctx->sp < executing->bos){
     PL011_putc(UART0, '*', true);
-    newStackPage(ctx, executing);
+    uint32_t r = newStackPage(executing);
+    // terminate process if there is insufficient stack space for the executing process
+    if(r == -1){
+      terminateChild(executing);
+      schedule(ctx);
+    }
   }
   else{
     PL011_putc(UART0, '?', true);
